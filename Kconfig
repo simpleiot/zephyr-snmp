@@ -1,0 +1,22 @@
+menuconfig LIB_SNMP
+	bool "Enable the SNMP library"
+	default n
+	help
+	  Library routines for SNMP
+
+if LIB_SNMP
+
+config SNMP_LOG_LEVEL
+	int "Default log level for SNMP"
+	default 4
+	help
+		The default log level, which is used to filter log messages.
+
+		0: None
+		1: Error
+		2: Warn
+		3: Info
+		4: Debug
+		5: Verbose
+
+endif #LIB_SNMP

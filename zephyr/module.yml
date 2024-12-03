@@ -1,0 +1,4 @@
+name: snmp
+build:
+  cmake: .
+  kconfig: Kconfig
