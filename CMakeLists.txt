@@ -2,6 +2,7 @@ if (CONFIG_LIB_SNMP)
 zephyr_library()
 zephyr_include_directories(include)
 zephyr_library_sources(
+  src/pbuf.c
   src/snmp_asn1.c
   src/snmp_asn1.h
   src/snmp_core.c
@@ -26,6 +27,7 @@ zephyr_library_sources(
   src/snmp_table.c
   src/snmp_threadsync.c
   src/snmp_traps.c
+  src/snmp_zephyr.c
   src/snmpv3.c
   src/snmpv3_mbedtls.c
   src/snmpv3_priv.h

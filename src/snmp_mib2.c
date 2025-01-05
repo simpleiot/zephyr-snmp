@@ -49,6 +49,7 @@
 #error LWIP_SNMP MIB2 needs MIB2_STATS (for MIB2)
 #endif
 
+#include "lwip/def.h"
 #include "lwip/snmp.h"
 #include "lwip/apps/snmp.h"
 #include "lwip/apps/snmp_core.h"
