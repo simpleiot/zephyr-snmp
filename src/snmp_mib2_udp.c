@@ -39,6 +39,7 @@
 #include "lwip/apps/snmp_mib2.h"
 #include "lwip/apps/snmp_table.h"
 #include "lwip/apps/snmp_scalar.h"
+#include "lwip/ip_addr.h"
 #include "lwip/udp.h"
 #include "lwip/stats.h"
 

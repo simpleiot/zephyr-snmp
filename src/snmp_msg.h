@@ -77,6 +77,8 @@ typedef enum {
 void snmp_vb_enumerator_init(struct snmp_varbind_enumerator *enumerator, struct pbuf *p, u16_t offset, u16_t length);
 snmp_vb_enumerator_err_t snmp_vb_enumerator_get_next(struct snmp_varbind_enumerator *enumerator, struct snmp_varbind *varbind);
 
+#define SNMP_MAX_COMMUNITY_SIZE 12U
+
 struct snmp_request {
   /* Communication handle */
   void *handle;
@@ -87,7 +89,7 @@ struct snmp_request {
   /* incoming snmp version */
   u8_t version;
   /* community name (zero terminated) */
-  u8_t community[SNMP_MAX_COMMUNITY_STR_LEN + 1];
+  u8_t community[SNMP_MAX_COMMUNITY_SIZE + 1];
   /* community string length (exclusive zero term) */
   u16_t community_strlen;
   /* request type */
@@ -150,7 +152,10 @@ struct snmp_request {
   u16_t outbound_scoped_pdu_string_offset;
 #endif
 
-  u8_t value_buffer[SNMP_MAX_VALUE_SIZE];
+//u8_t value_buffer[SNMP_MAX_VALUE_SIZE];
+#define SNMP_VALUE_BUFFER_SIZE   200
+
+  u8_t value_buffer[SNMP_VALUE_BUFFER_SIZE];
 };
 
 /** A helper struct keeping length information about varbinds */
