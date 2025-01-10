@@ -40,7 +40,6 @@
 
 	#include <netinet/in.h>
 	#include <sys/socket.h>
-	#include <arpa/inet.h>
 	#include <unistd.h>
 
 #else
@@ -49,6 +48,8 @@
 	#include <zephyr/kernel.h>
 
 #endif
+
+#include <arpa/inet.h>
 
 #include <zephyr/logging/log.h>
 #include <zephyr/net/net_if.h>
@@ -86,54 +87,24 @@
 /** The default network interface. */
 	struct netif * netif_default;
 
-	static void go_sleep();
+/** The UDP socket serving SNMP get-request/response. */
+	static int udp_socket_serv;
 
-	extern char * inet_ntoa( struct in_addr in );
+/** The UDP socket that sends traps. */
+	static int udp_socket_trap;
+
+	static void go_sleep();
 
 	void net_if_callback( struct net_if * iface,
 						  void * user_data )
 	{
 		/* Just for test. */
-		zephyr_log( "net_if_callback: called" );
+		zephyr_log( "net_if_callback: called\n" );
 	}
 
-/** SNMP netconn API worker thread */
-	static void snmp_zephyr_thread( void * arg1,
-									void * arg2,
-									void * arg3 )
-	{
-		int udp_socket;
-
-		LWIP_UNUSED_ARG( arg1 );
-		LWIP_UNUSED_ARG( arg2 );
-		LWIP_UNUSED_ARG( arg3 );
-
-		#if 0
-			/* Bind to SNMP port with default IP address */
-			#if LWIP_IPV6
-				conn = netconn_new( NETCONN_UDP_IPV6 );
-				netconn_bind( conn, IP6_ADDR_ANY, LWIP_IANA_PORT_SNMP );
-			#else /* LWIP_IPV6 */
-				conn = netconn_new( NETCONN_UDP );
-				netconn_bind( conn, IP4_ADDR_ANY, LWIP_IANA_PORT_SNMP );
-			#endif /* LWIP_IPV6 */
-			LWIP_ERROR( "snmp_netconn: invalid conn", ( conn != NULL ), return;
-
-						);
-		#endif /* 0 */
-
-		int opt;
-		socklen_t optlen = sizeof( int );
-		int ret;
-		struct sockaddr_in6 bind_addr =
+	static void wait_for_ethernet()
 		{
-			.sin6_family = AF_INET,
-			.sin6_addr   = IN6ADDR_ANY_INIT,
-			.sin6_port   = htons( LWIP_IANA_PORT_SNMP ),
-		};
-
 		k_sleep( Z_TIMEOUT_MS( 1000 ) );
-		zephyr_log( "process_udp: started" );
 
 		struct net_if * iface = net_if_get_default();
 
@@ -142,7 +113,7 @@
 			for( ; ; )
 			{
 				int is_up = net_if_is_up( iface );
-				zephyr_log( "process_udp: Name \"%s\" UP: %s",
+				zephyr_log( "process_udp: Name \"%s\" UP: %s\n",
 							iface->if_dev->dev->name,
 							is_up ? "true" : "false" );
 
@@ -154,74 +125,135 @@
 				k_sleep( Z_TIMEOUT_MS( 1000 ) );
 			}
 		}
+	}
 
-		udp_socket = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
+	static int create_socket(unsigned port)
+	{
+		int socket_fd = -1;
+		int opt;
+		int ret;
+		socklen_t optlen = sizeof( int );
 
-		if( udp_socket < 0 )
+		struct sockaddr_in6 bind_addr =
 		{
-			zephyr_log( "process_udp: error: socket: %d errno: %d", udp_socket, errno );
-			go_sleep( 1 );
+			.sin6_family = AF_INET,
+			.sin6_addr   = IN6ADDR_ANY_INIT,
+			.sin6_port   = htons( port ),
+		};
+
+		socket_fd = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
+
+		if( socket_fd < 0 )
+		{
+			zephyr_log( "process_udp: error: socket: %d errno: %d\n", socket_fd, errno );
 		}
+		else
+		{
+			zephyr_log( "process_udp: socket: %d %s (OK)\n",
+				socket_fd,
+				port == LWIP_IANA_PORT_SNMP_TRAP ? "traps" : "server");
 
-		zephyr_log( "process_udp: socket: %d (OK)", udp_socket );
-
-		ret = getsockopt( udp_socket, IPPROTO_IPV6, IPV6_V6ONLY, &opt, &optlen );
+			ret = getsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, &optlen );
 
 		if( ret == 0 )
 		{
 			if( opt )
 			{
-				zephyr_log( "process_udp: IPV6_V6ONLY option is on, turning it off." );
+					zephyr_log( "process_udp: IPV6_V6ONLY option is on, turning it off.\n" );
 
 				opt = 0;
-				ret = setsockopt( udp_socket, IPPROTO_IPV6, IPV6_V6ONLY,
+					ret = setsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY,
 								  &opt, optlen );
 
 				if( ret < 0 )
 				{
-					zephyr_log( "process_udp: Cannot turn off IPV6_V6ONLY option" );
+						zephyr_log( "process_udp: Cannot turn off IPV6_V6ONLY option\n" );
 				}
-				else
-				{
-					zephyr_log( "Sharing same socket between IPv6 and IPv4" );
 				}
 			}
+
+			if( bind( socket_fd, ( struct sockaddr * ) &bind_addr, sizeof( bind_addr ) ) < 0 )
+				{
+				zephyr_log( "error: bind: %d\n", errno );
+				go_sleep( 1 );
+				}
+			}
+		return socket_fd;
 		}
 
-		if( bind( udp_socket, ( struct sockaddr * ) &bind_addr, sizeof( bind_addr ) ) < 0 )
+	static void snmp_send_trap_test()
 		{
-			zephyr_log( "error: bind: %d", errno );
-			go_sleep( 1 );
+		/** Initiate a trap for testing. */
+		/// Setting version to use for testing.
+		snmp_set_default_trap_version(SNMP_VERSION_2c);
+
+		ip_addr_t dst;
+		struct in_addr in_addr;
+		dst.addr = inet_addr("192.168.2.11");
+		
+		in_addr.s_addr = dst.addr;
+		
+		snmp_trap_dst_enable(0, true);
+		snmp_trap_dst_ip_set(0, &dst);
+
+		zephyr_log ("Sending a cold-start trap to %s:%u\n",
+			inet_ntoa(in_addr), LWIP_IANA_PORT_SNMP_TRAP);
+		snmp_coldstart_trap();
 		}
 
-		LOG_INF( "Wait for a packet on port %d.", LWIP_IANA_PORT_SNMP );
+/** SNMP netconn API worker thread */
+	static void snmp_zephyr_thread( void * arg1,
+									void * arg2,
+									void * arg3 )
+	{
+		LWIP_UNUSED_ARG( arg1 );
+		LWIP_UNUSED_ARG( arg2 );
+		LWIP_UNUSED_ARG( arg3 );
 
-		snmp_traps_handle = ( void * ) udp_socket;
+		wait_for_ethernet();
 
-/*  net_if_foreach(net_if_callback, NULL); */
+		udp_socket_serv = create_socket(LWIP_IANA_PORT_SNMP);
+		udp_socket_trap = create_socket(LWIP_IANA_PORT_SNMP_TRAP);
+
+		if (udp_socket_serv >= 0) {
+			struct timeval tv;
+			memset (&tv, 0, sizeof tv);
+			tv.tv_sec = 10;  /* 10 Secs Timeout */
+			int ret = setsockopt(udp_socket_serv, SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
+
+			zephyr_log( "sockopt hnd=%d tmout=%u ret=%d errno %d\n", udp_socket_serv, tv.tv_sec, ret, errno );
+		}
+
+		snmp_traps_handle = ( void * ) udp_socket_trap;
 
 		do
 		{
 			struct sockaddr client_addr;
 			struct sockaddr_in * sin = ( struct sockaddr_in * ) &client_addr;
 			#define CHAR_BUF_LEN  512
-			char * char_buffer;
+			static char * char_buffer = NULL;
 			if (char_buffer == NULL) {
 				char_buffer = k_malloc(CHAR_BUF_LEN);
 			}
 			socklen_t client_addr_len = sizeof( client_addr );
-			int len = recvfrom( udp_socket,
+			int len = recvfrom( udp_socket_serv,
 								char_buffer,
 								CHAR_BUF_LEN, 0,
 								&client_addr,
 								&client_addr_len );
-
-			if( len > 0 )
+			if( len <= 0 )
 			{
-				LOG_INF( "process_udp: Recv %d bytes from %s:%u",
-						 len, inet_ntoa( sin->sin_addr ), ntohs( sin->sin_port ) );
+				/* A normal time-out in recvfrom().
+				 * Could call snmp_send_trap_test() here for testing. */
+			}
+			else
+			{
+				LOG_INF( "process_udp: Hnd %d recv %d bytes from %s:%u\n",
+						 (int)udp_socket_serv,
+						 len,
+						 inet_ntoa( sin->sin_addr ),
+						 ntohs( sin->sin_port ) );
 				struct pbuf * pbuf = pbuf_alloc( PBUF_TRANSPORT, len, PBUF_RAM );
-				LOG_INF( "pbuf_alloc returns %p", pbuf );
 
 				if( pbuf != NULL )
 				{
@@ -233,9 +265,11 @@
 
 					ip_addr_t from_address;
 					from_address.addr = sin->sin_addr.s_addr;
-					snmp_receive( ( void * ) udp_socket, pbuf, &from_address, sin->sin_port );
+					snmp_receive( ( void * ) udp_socket_serv, pbuf, &from_address, sin->sin_port );
 					pbuf_free (pbuf);
 				}
+
+				snmp_send_trap_test();
 			}
 		} while( 1 );
 	}
@@ -247,15 +281,17 @@
 	{
 		err_t result;
 		struct sockaddr client_addr;
-		struct sockaddr_in * in_addr = ( struct sockaddr_in * ) &client_addr;
+		struct sockaddr_in * client_addr_in = ( struct sockaddr_in * ) &client_addr;
 		socklen_t client_addr_len = sizeof( client_addr );
 
-		memcpy( &in_addr->sin_addr, &dst->addr, sizeof dst->addr );
-		in_addr->sin_port = port;
+		client_addr_in->sin_addr.s_addr = dst->addr;
+		client_addr_in->sin_port = ntohs (port);
+		client_addr_in->sin_family = AF_INET;
+		// snmp_sendto: hnd = 8 port = 162, IP=C0A80213, len = 65
+		zephyr_log("snmp_sendto: hnd = %d port = %u, IP=%08X, len = %d\n",
+			(int) handle, port, client_addr_in->sin_addr.s_addr, p->len);
 
 		result = sendto( ( int ) handle, p->payload, p->len, 0, &client_addr, client_addr_len );
-
-/*result = sendto((int)handle, &buf, dst, port); */
 
 		return result;
 	}
@@ -264,34 +300,21 @@
 									const ip_addr_t * dst,
 									ip_addr_t * result )
 	{
-		struct netconn * conn = ( struct netconn * ) handle;
 		struct netif * dst_if;
-		const ip_addr_t * dst_ip;
+		ip_addr_t * dst_ip = dst;
 		struct in_addr in_addr;
 
 		in_addr.s_addr = dst->addr;
-        zephyr_log ("snmp_get_local_ip_for_dst: dst->addr = %s",
+        zephyr_log ("snmp_get_local_ip_for_dst: dst->addr = %s\n",
 			inet_ntoa(in_addr));
-
-		LWIP_UNUSED_ARG( conn ); /* unused in case of IPV4 only configuration */
-		return false;
-
-/*  ip_route_get_local_ip(&conn->pcb.udp->local_ip, dst, dst_if, dst_ip); */
-		LOG_INF( "Skipped call to ip_route_get_local_ip()" );
-
-		if( ( dst_if != NULL ) && ( dst_ip != NULL ) )
-		{
 			ip_addr_copy( *result, *dst_ip );
+
 			return 1;
 		}
-		else
-		{
-			return 0;
-		}
-	}
 
 	static void go_sleep()
 	{
+		/* Some fatal error occurred, sleep for ever. */
 		for( ; ; )
 		{
 			k_sleep( Z_TIMEOUT_MS( 5000 ) );
@@ -303,7 +326,6 @@
  */
 	void snmp_init( void )
 	{
-/*sys_thread_new("snmp_netconn", snmp_zephyr_thread, NULL, SNMP_STACK_SIZE, SNMP_THREAD_PRIO); */
 		snmp_thread = k_thread_create(
 			&snmp_thread_data,      /* struct k_thread * new_thread, */
 			snmp_stack,             /* k_thread_stack_t * stack, */
@@ -370,11 +392,25 @@ void zephyr_log( const char * format,
 				 ... )
 {
 	va_list args;
-	char toprint[ 129 ];
+	char toprint[ 201 ];
 
 	va_start( args, format );
-	int rc = vsnprintf(toprint, sizeof toprint, format, args);
+	size_t rc = vsnprintf(toprint, sizeof toprint, format, args);
 	va_end( args );
+	if (rc > 2) {
+		if (rc > sizeof toprint - 1) {
+			rc = sizeof toprint - 1; /* buffer was too short */
+		}
+		while (rc > 0) {
+			if (toprint[rc-1] != 10 && toprint[rc-1] != 13)	{
+				break;
+			}
+			/* Remove the CR or LF */
+			toprint[--rc] = 0;
+		}
+	}
 
+	if (rc >= 1) {
 	LOG_INF( "%s", toprint );
+	}
 }

@@ -299,7 +299,7 @@ snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t por
   snmp_stats.inpkts++;
 
   err = snmp_parse_inbound_frame(&request);
-  zephyr_log("snmp_receive: snmp_parse returns %d", err);
+  zephyr_log("snmp_receive: snmp_parse returns %d\n", err);
 
   if (err == ERR_OK) {
     if (request.request_type == SNMP_ASN1_CONTEXT_PDU_GET_RESP) {
@@ -375,7 +375,7 @@ snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t por
           break;
           default:
             /* Unknown or unhandled error_status */
-            zephyr_log("Unknown or unhandled error_status", request.error_status);
+            zephyr_log("Unknown/unhandled error_status\n", request.error_status);
             err = ERR_ARG;
         }
 
@@ -531,7 +531,7 @@ snmp_process_get_request(struct snmp_request *request)
       break;
     } else if (err == SNMP_VB_ENUMERATOR_ERR_ASN1ERROR) {
       /* malformed ASN.1, don't answer */
-	  zephyr_log ("snmp_process_get_request: malformed ASN.1, don't answer");
+	  zephyr_log ("snmp_process_gr: malformed ASN.1, don't answer\n");
       return ERR_ARG;
     } else {
       request->error_status = SNMP_ERR_GENERROR;
@@ -809,13 +809,13 @@ snmp_parse_inbound_frame(struct snmp_request *request)
 
   IF_PARSE_EXEC(snmp_pbuf_stream_init(&pbuf_stream, request->inbound_pbuf, 0, request->inbound_pbuf->tot_len));
 
-zephyr_log("snmp_parse 1 bytes %d", request->inbound_pbuf->tot_len);
+//zephyr_log("snmp_parse 1 bytes %d\n", request->inbound_pbuf->tot_len);
 
   /* decode main container consisting of version, community and PDU */
   IF_PARSE_EXEC(snmp_asn1_dec_tlv(&pbuf_stream, &tlv));
 
   if((tlv.type != SNMP_ASN1_TYPE_SEQUENCE) || (tlv.value_len != pbuf_stream.length)) {
-    zephyr_log("snmp_parse: type = %d ASN1_TYPE %d value_len %d length %d",
+    zephyr_log("snmp_parse: type = %d ASN1_TYPE %d vlen %d length %d\n",
 	tlv.type, SNMP_ASN1_TYPE_SEQUENCE,
 	tlv.value_len, pbuf_stream.length);
   }
@@ -841,7 +841,7 @@ zephyr_log("snmp_parse 1 bytes %d", request->inbound_pbuf->tot_len);
       || (!snmp_version_enabled(s32_value))
 #endif
      ) {
-    zephyr_log("snmp_parse_inbound_frame: unsupported SNMP version %d", s32_value);
+    zephyr_log("snmp_parse: unsupported SNMP v%d\n", s32_value);
     /* unsupported SNMP version */
     snmp_stats.inbadversions++;
     return ERR_ARG;
