@@ -225,6 +225,24 @@ snmp_mib2_set_syslocation_readonly(const u8_t *ocstr, const u16_t *ocstrlen)
   }
 }
 
+const char *oid_names[] = {
+    "oidNull",
+    "sysDescr",
+    "sysObjectID",
+    "sysUpTime",
+    "sysContact",
+    "sysName",
+    "sysLocation",
+    "sysServices",
+};
+//#define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
+static const char *oid_name(int index)
+{
+	if (index < (sizeof oid_names / sizeof oid_names[0])) {
+		return oid_names[index];
+	}
+	return "oidUnknown";
+}
 
 static s16_t
 system_get_value(const struct snmp_scalar_array_node_def *node, void *value)
@@ -232,6 +250,8 @@ system_get_value(const struct snmp_scalar_array_node_def *node, void *value)
   const u8_t  *var = NULL;
   const s16_t *var_len;
   u16_t result;
+
+  zephyr_log("system_get_value(%d): %s\n", node->oid, oid_name(node->oid));
 
   switch (node->oid) {
     case 1: /* sysDescr */

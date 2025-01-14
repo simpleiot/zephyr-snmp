@@ -298,12 +298,35 @@ snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t por
 
   snmp_stats.inpkts++;
 
-  err = snmp_parse_inbound_frame(&request);
-  zephyr_log("snmp_receive: snmp_parse returns %d", err);
+  err = snmp_parse_inbound_frame( &request );
+  zephyr_log( "snmp_receive: snmp_parse returns %d\n", err );
 
   if (err == ERR_OK) {
-    if (request.request_type == SNMP_ASN1_CONTEXT_PDU_GET_RESP) {
-      if (request.error_status == SNMP_ERR_NOERROR) {
+    if (request.request_type == SNMP_ASN1_CONTEXT_PDU_GET_RESP)	{
+      if (request.error_status == SNMP_ERR_NOERROR)	{
+        zephyr_log( "snmp_receive: received a response\n" );
+        snmp_vb_enumerator_err_t err;
+        struct snmp_varbind vb;
+
+        memset( &vb, 0, sizeof vb );
+        vb.value = request.value_buffer;
+
+        LWIP_DEBUGF( SNMP_DEBUG, ( "SNMP_get_request %d", request.request_type ) );
+
+        while( request.error_status == SNMP_ERR_NOERROR ) {
+          err = snmp_vb_enumerator_get_next( &request.inbound_varbind_enumerator, &vb );
+          if( err == SNMP_VB_ENUMERATOR_ERR_OK ) {
+            char buf[ 128 ];
+            extern const char * print_oid (char * buf,
+                                           size_t buf_size,
+                                           size_t oid_len,
+                                           u32_t * oid_words);
+            print_oid( buf, sizeof buf, vb.oid.len, vb.oid.id );
+            LWIP_DEBUGF( SNMP_DEBUG, ( "Request %s\n", buf ) );
+            break;
+          }
+        }
+
         /* If callback function has been defined call it. */
         if (snmp_inform_callback != NULL) {
           snmp_inform_callback(&request, snmp_inform_callback_arg);
@@ -510,17 +533,31 @@ snmp_process_varbind(struct snmp_request *request, struct snmp_varbind *vb, u8_t
  * @param request points to the associated message process state
  */
 static err_t
-snmp_process_get_request(struct snmp_request *request)
+snmp_process_get_request( struct snmp_request * request )
 {
   snmp_vb_enumerator_err_t err;
   struct snmp_varbind vb;
+
+  /* _HT_ for debug only, clean up later. */
+  memset( &vb, 0, sizeof vb );
   vb.value = request->value_buffer;
 
-  LWIP_DEBUGF(SNMP_DEBUG, ("SNMP get request"));
+  LWIP_DEBUGF( SNMP_DEBUG, ( "SNMP_get_request %d", request->request_type ) );
 
-  while (request->error_status == SNMP_ERR_NOERROR) {
-    err = snmp_vb_enumerator_get_next(&request->inbound_varbind_enumerator, &vb);
-    if (err == SNMP_VB_ENUMERATOR_ERR_OK) {
+  while( request->error_status == SNMP_ERR_NOERROR ) {
+    err = snmp_vb_enumerator_get_next( &request->inbound_varbind_enumerator, &vb );
+
+    if( err == SNMP_VB_ENUMERATOR_ERR_OK ) {
+      {
+         char buf[ 128 ];
+         extern const char * print_oid(char * buf,
+                                       size_t buf_size,
+                                       size_t oid_len,
+                                       u32_t * oid_words );
+         print_oid( buf, sizeof buf, vb.oid.len, vb.oid.id );
+         LWIP_DEBUGF( SNMP_DEBUG, ( "Request %s\n", buf ) );
+      }
+
       if ((vb.type == SNMP_ASN1_TYPE_NULL) && (vb.value_len == 0)) {
         snmp_process_varbind(request, &vb, 0);
       } else {
@@ -809,13 +846,13 @@ snmp_parse_inbound_frame(struct snmp_request *request)
 
   IF_PARSE_EXEC(snmp_pbuf_stream_init(&pbuf_stream, request->inbound_pbuf, 0, request->inbound_pbuf->tot_len));
 
-zephyr_log("snmp_parse 1 bytes %d", request->inbound_pbuf->tot_len);
+//zephyr_log("snmp_parse 1 bytes %d\n", request->inbound_pbuf->tot_len);
 
   /* decode main container consisting of version, community and PDU */
   IF_PARSE_EXEC(snmp_asn1_dec_tlv(&pbuf_stream, &tlv));
 
   if((tlv.type != SNMP_ASN1_TYPE_SEQUENCE) || (tlv.value_len != pbuf_stream.length)) {
-    zephyr_log("snmp_parse: type = %d ASN1_TYPE %d value_len %d length %d",
+    zephyr_log("snmp_parse: type = %d ASN1_TYPE %d vlen %d length %d\n",
 	tlv.type, SNMP_ASN1_TYPE_SEQUENCE,
 	tlv.value_len, pbuf_stream.length);
   }
@@ -841,7 +878,7 @@ zephyr_log("snmp_parse 1 bytes %d", request->inbound_pbuf->tot_len);
       || (!snmp_version_enabled(s32_value))
 #endif
      ) {
-    zephyr_log("snmp_parse_inbound_frame: unsupported SNMP version %d", s32_value);
+    zephyr_log("snmp_parse: unsupported SNMP v%d\n", s32_value);
     /* unsupported SNMP version */
     snmp_stats.inbadversions++;
     return ERR_ARG;
@@ -1661,6 +1698,7 @@ snmp_complete_outbound_frame(struct snmp_request *request)
         case SNMP_ERR_NOSUCHINSTANCE:
         case SNMP_ERR_NOSUCHOBJECT:
         case SNMP_ERR_ENDOFMIBVIEW:
+		  zephyr_log("SNMP_ERR_NOSUCHINSTANCE\n");
           request->error_status = SNMP_ERR_NOSUCHNAME;
           break;
         /* mapping according to RFC */

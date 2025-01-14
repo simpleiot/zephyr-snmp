@@ -239,7 +239,7 @@ struct pbuf * pbuf_alloc( pbuf_layer layer,
 	struct pbuf * p;
 	u16_t offset = ( u16_t ) layer;
 
-	LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ( "pbuf_alloc(length=%"U16_F ")", length ) );
+//	LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ( "pbuf_alloc(length=%"U16_F ")", length ) );
 
 	switch( type )
 	{
@@ -334,8 +334,8 @@ struct pbuf * pbuf_alloc( pbuf_layer layer,
 			return NULL;
 	}
 
-	zephyr_log( "pbuf_alloc: len %d type %d", length, type );
-	LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ( "pbuf_alloc(length=%"U16_F ") == %p", length, ( void * ) p ) );
+//	zephyr_log( "pbuf_alloc: len %d type %d", length, type );
+//	LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ( "pbuf_alloc(length=%"U16_F ") == %p", length, ( void * ) p ) );
 	return p;
 }
 
@@ -833,7 +833,7 @@ u8_t pbuf_free( struct pbuf * p )
 		return 0;
 	}
 
-	LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ( "pbuf_free(%p)", ( void * ) p ) );
+//	LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ( "pbuf_free(%p)", ( void * ) p ) );
 
 	PERF_START;
 
@@ -861,7 +861,7 @@ u8_t pbuf_free( struct pbuf * p )
 		{
 			/* remember next pbuf in chain for next iteration */
 			q = p->next;
-			LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ( "pbuf_free: deallocating %p", ( void * ) p ) );
+//			LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ( "pbuf_free: deallocating %p", ( void * ) p ) );
 			alloc_src = pbuf_get_allocsrc( p );
 			#if LWIP_SUPPORT_CUSTOM_PBUF
 				/* is this a custom pbuf? */
