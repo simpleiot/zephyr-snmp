@@ -25,6 +25,7 @@ u32_t sys_now (void);
 
 #define LWIP_DONT_PROVIDE_BYTEORDER_FUNCTIONS  1
 
+/* _HT_ define not used any more. */
 #define DEFAULT_THREAD_STACKSIZE  1024
 #define DEFAULT_THREAD_PRIO       5
 
@@ -76,7 +77,7 @@ typedef struct ip4_addr ip4_addr_t;
 
 #include "lwip/stats.h"
 
-void zephyr_log(const char * format, ...);
+size_t zephyr_log(const char * format, ...);
 
 /** In the following macro, message will contain
  *  both a format string and possible arguments. */

@@ -136,6 +136,9 @@ void snmp_authfail_trap(void);
 typedef void (*snmp_write_callback_fct)(const u32_t* oid, u8_t oid_len, void* callback_arg);
 void snmp_set_write_callback(snmp_write_callback_fct write_callback, void* callback_arg);
 
+/* Function to write an object ID as a readable string "1.4.2.3" */
+const char * print_oid (size_t oid_len, const u32_t * oid_words);
+
 #endif /* LWIP_SNMP */
 
 #ifdef __cplusplus

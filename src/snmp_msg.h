@@ -153,7 +153,7 @@ struct snmp_request {
 #endif
 
 //u8_t value_buffer[SNMP_MAX_VALUE_SIZE];
-#define SNMP_VALUE_BUFFER_SIZE   200
+#define SNMP_VALUE_BUFFER_SIZE   64
 
   u8_t value_buffer[SNMP_VALUE_BUFFER_SIZE];
 };
