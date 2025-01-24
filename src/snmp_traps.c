@@ -307,6 +307,7 @@ snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16
   /* allocate pbuf(s) */
   p = pbuf_alloc(PBUF_TRANSPORT, tot_len, PBUF_RAM);
   if (p != NULL) {
+    int rc;
     struct snmp_pbuf_stream pbuf_stream;
     snmp_pbuf_stream_init(&pbuf_stream, p, 0, tot_len);
 
@@ -318,9 +319,13 @@ snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16
     snmp_stats.outpkts++;
 
     /** send to the TRAP destination */
-    err = snmp_sendto(snmp_traps_handle, p, dip, LWIP_IANA_PORT_SNMP_TRAP);
+    rc = snmp_sendto(snmp_traps_handle, p, dip, LWIP_IANA_PORT_SNMP_TRAP);
+    if (rc <= 0) {
+		err = ERR_CONN;
+	}
     pbuf_free(p);
   } else {
+	zephyr_log ("snmp_send_msg: pbuf_alloc failed\n");
     err = ERR_MEM;
   }
   return err;

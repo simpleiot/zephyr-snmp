@@ -75,13 +75,10 @@
 	{
 		int socket_161;  /* SNMP/serv socket */
 		int socket_162;  /* SNMP/trap socket */
-		fd_set read_set; /* A set of file descriptors. */
-		struct timeval timeout; /* Maximum time to wait for an exvent. */
+		struct timeval timeout; /* Maximum time to wait for an event. */
 		int select_max;  /* The max parameter for select. */
 	} socket_set_t;
 
-	static k_tid_t snmp_thread;
-	static struct k_thread snmp_thread_data;
 	const ip_addr_t ip_addr_any;
 
 /** udp_pcbs export for external reference (e.g. SNMP agent) */
@@ -99,13 +96,18 @@
 
 	static void go_sleep();
 
-	void net_if_callback( struct net_if * iface,
-						  void * user_data )
-	{
-		/* Just for test. */
-		zephyr_log( "net_if_callback: called\n" );
-	}
+/** Wake up the thread 'z_snmp_client' in order to send a trap. */
+	void snmp_send_zbus(void);
 
+	static socket_set_t socket_set;
+
+	#define CHAR_BUF_LEN  512 /* declared on the heap at first time use. */
+	char char_buffer[CHAR_BUF_LEN];
+
+
+	/* Wait for the negotiation of the DHCP client.
+	 * It will sleep for 500 ms and poll 'dhcpv4.state'.
+	 * It will wait at most 12 seconds. */
 	static void wait_for_ethernet()
 	{
 		k_sleep( Z_TIMEOUT_MS( 1000 ) );
@@ -114,19 +116,22 @@
 
 		if( iface != NULL )
 		{
-			for( ; ; )
+			int counter;
+			enum net_dhcpv4_state last_state = NET_DHCPV4_DISABLED;
+			for(counter = 0; counter< 24 ; counter++)
 			{
 				int is_up = net_if_is_up( iface );
-				zephyr_log( "\nprocess_udp: Name \"%s\" UP: %s\n",
-							iface->if_dev->dev->name,
-							is_up ? "true" : "false" );
-
-				if( is_up )
-				{
+				if (last_state != iface->config.dhcpv4.state) {
+					last_state = iface->config.dhcpv4.state;
+					zephyr_log( "DHCP: Name \"%s\" UP: %s DHCP %s\n",
+								iface->if_dev->dev->name,
+								is_up ? "true" : "false",
+								net_dhcpv4_state_name(iface->config.dhcpv4.state));
+				}
+				if (iface->config.dhcpv4.state >= NET_DHCPV4_REBINDING) {
 					break;
 				}
-
-				k_sleep( Z_TIMEOUT_MS( 1000 ) );
+				k_sleep( Z_TIMEOUT_MS( 500 ) );
 			}
 		}
 	}
@@ -149,30 +154,28 @@
 
 		if( socket_fd < 0 )
 		{
-			zephyr_log( "process_udp: error: socket: %d errno: %d\n", socket_fd, errno );
+			zephyr_log( "create_socket: error: socket: %d errno: %d\n", socket_fd, errno );
+			go_sleep( 1 );
 		}
 		else
 		{
-			zephyr_log( "process_udp: socket: %d %s (OK)\n",
+			zephyr_log( "create_socket: socket: %d %s (OK)\n",
 				socket_fd,
-				port == LWIP_IANA_PORT_SNMP_TRAP ? "traps" : "server");
+				(port == LWIP_IANA_PORT_SNMP_TRAP) ? "traps" : "server");
 
 			ret = getsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, &optlen );
 
-			if( ret == 0 )
+			if (ret == 0 && opt != 0)
 			{
-				if( opt )
+				zephyr_log( "create_socket: IPV6_V6ONLY option is on, turning it off.\n" );
+
+				opt = 0;
+				ret = setsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY,
+								  &opt, optlen );
+
+				if( ret < 0 )
 				{
-					zephyr_log( "process_udp: IPV6_V6ONLY option is on, turning it off.\n" );
-
-					opt = 0;
-					ret = setsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY,
-									  &opt, optlen );
-
-					if( ret < 0 )
-					{
-						zephyr_log( "process_udp: Cannot turn off IPV6_V6ONLY option\n" );
-					}
+					zephyr_log( "create_socket: Cannot turn off IPV6_V6ONLY option\n" );
 				}
 			}
 
@@ -184,14 +187,14 @@
 
 			if( bind( socket_fd, ( struct sockaddr * ) &bind_addr, sizeof( bind_addr ) ) < 0 )
 			{
-				zephyr_log( "error: bind: %d\n", errno );
+				zephyr_log( "create_socket: bind: %d\n", errno );
 				go_sleep( 1 );
 			}
 		}
 		return socket_fd;
 	}
 
-	static void snmp_send_trap_test()
+	void snmp_prepare_trap_test(const char * ip_address)
 	{
 		/** Initiate a trap for testing. */
 		/// Setting version to use for testing.
@@ -199,17 +202,86 @@
 
 		ip_addr_t dst;
 		struct in_addr in_addr;
-		dst.addr = inet_addr("192.168.2.11");
-		dst.addr = inet_addr("192.168.2.17");
+//		dst.addr = inet_addr("192.168.2.11");
+		dst.addr = inet_addr(ip_address);
 		
 		in_addr.s_addr = dst.addr;
 		
 		snmp_trap_dst_enable(0, true);
 		snmp_trap_dst_ip_set(0, &dst);
+	}
 
-		zephyr_log ("Sending a cold-start trap to %s:%u\n",
-			inet_ntoa(in_addr), LWIP_IANA_PORT_SNMP_TRAP);
-		snmp_coldstart_trap();
+	/* Define the OID for the enterprise object
+	   struct snmp_obj_id
+	   {
+	  	  u8_t len;
+	  	  u32_t id[SNMP_MAX_OBJ_ID_LEN];
+	   };
+	*/
+
+	#define ENTERPRISE_OID {7, {1,3,6,1,4,1,12345} } // Example OID, replace with actual
+
+	// Function to send SNMP trap
+	void send_snmp_trap(const char * ip_address)
+	{
+		snmp_prepare_trap_test(ip_address);
+
+  		struct snmp_varbind *varbinds = NULL;
+		struct snmp_obj_id eoid = ENTERPRISE_OID; // Set enterprise OID
+		s32_t generic_trap = 6; // Generic trap code (e.g., 6 for enterprise specific)
+		s32_t specific_trap = 1; // Specific trap code (customize as needed)
+
+		// Allocate memory for varbinds, about 220 bytes
+		// It will allocate SNMP_MAX_OBJ_ID_LEN (50) uint32's.
+		varbinds = (struct snmp_varbind *)mem_malloc(sizeof(struct snmp_varbind));
+/*
+Simple Network Management Protocol
+    version: version-1 (0)
+    community: private
+    data: trap (4)
+        trap
+            enterprise: 1.3.6.1.2.1.1.4 (iso.3.6.1.2.1.1.4)
+            agent-addr: 192.168.56.1
+            generic-trap: enterpriseSpecific (6)
+            specific-trap: 0
+            time-stamp: 3246732727
+            variable-bindings: 0 items
+0000   30 2c 02 01 00 04 07 70 72 69 76 61 74 65 a4 1e   0,.....private..
+0010   06 07 2b 06 01 02 01 01 04 40 04 c0 a8 38 01 02   ..+......@...8..
+0020   01 06 02 01 00 43 05 00 c1 85 35 b7 30 00         .....C....5.0.
+*/
+		if (varbinds != NULL) {
+			int index;
+			// Set up varbinds
+			varbinds->oid.len = 8;// Length of OID
+
+			varbinds->oid.id[0] = 1;
+			varbinds->oid.id[1] = 3;
+			varbinds->oid.id[2] = 6;
+			varbinds->oid.id[3] = 1;
+			varbinds->oid.id[4] = 2;
+			varbinds->oid.id[5] = 1;
+			varbinds->oid.id[6] = 1;
+			varbinds->oid.id[7] = 4;
+
+			varbinds->type = SNMP_ASN1_TYPE_UNSIGNED32; // Type of the variable
+			u32_t value = 100;                   // Example value to send
+			varbinds->value = (void *)&value;    // Pointer to value
+			varbinds->value_len = sizeof(value); // Length of value
+
+			err_t err = snmp_send_trap(&eoid, generic_trap, specific_trap, varbinds);
+			
+			if (err == ERR_OK) {
+				zephyr_log("SNMP trap sent successfully.\n");
+			} else {
+				zephyr_log("Failed to send SNMP trap: %d\n", err);
+			}
+
+			// Free allocated memory for varbinds
+			mem_free(varbinds);
+		} else {
+			zephyr_log("Memory allocation failed for varbinds.\n");
+		}
 	}
 
 	static int max_int(int left, int right)
@@ -222,35 +294,42 @@
 		return rc;
 	}
 
-	static void loop_for_ever(socket_set_t * socket_set)
+	void snmp_loop()
 	{
-		#define CHAR_BUF_LEN  512
-		char * char_buffer = k_malloc(CHAR_BUF_LEN);
+		int rc_select;
+		fd_set read_set; /* A set of file descriptors. */
+		FD_ZERO(&read_set);
+		FD_SET(socket_set.socket_161, &read_set);
+		FD_SET(socket_set.socket_162, &read_set);
+		socket_set.select_max = max_int(socket_set.socket_161, socket_set.socket_162) + 1;
 
-		socket_set->timeout.tv_sec = 0;
-		socket_set->timeout.tv_usec = 10000U;
-		do
+		rc_select = select(socket_set.select_max, &read_set, NULL, NULL, &(socket_set.timeout));
+		if (rc_select > 0) for (int index = 0; index < 2; index++)
 		{
-			struct sockaddr client_addr;
-			struct sockaddr_in * sin = ( struct sockaddr_in * ) &client_addr;
-			socklen_t client_addr_len = sizeof( client_addr );
-			select(socket_set->select_max, &socket_set->read_set, NULL, NULL, &(socket_set->timeout));
-
-			for (int index = 0; index < 2; index++)
+			int udp_socket = (index == 0) ? socket_set.socket_161 : socket_set.socket_162;
+			if (FD_ISSET(udp_socket, &read_set))
 			{
-				int udp_socket = (index == 0) ? socket_set->socket_161 : socket_set->socket_162;
-				int len = recvfrom( udp_socket,
-									char_buffer,
-									CHAR_BUF_LEN, 0,
-									&client_addr,
-									&client_addr_len );
-
-				if (len > 0 && index == 0)
+				struct sockaddr client_addr;
+				struct sockaddr_in * sin = (struct sockaddr_in *) &client_addr;
+				socklen_t client_addr_len = sizeof client_addr;
+				int len;
+				len = recvfrom( udp_socket,
+								char_buffer,
+								sizeof char_buffer,
+								0, // flags
+								&client_addr,
+								&client_addr_len );
+				if (len > 0) {
+					int port = (index == 0) ? 161 : 162;
+					zephyr_log( "recv[%u]: %d bytes from %s:%u\n",
+						 port,
+						 len,
+						 inet_ntoa(sin->sin_addr),
+						 ntohs(sin->sin_port));
+				}
+				if (len > 0) //  && index == 0)
 				{
-					LOG_INF( "process_udp: Recv %d bytes from %s:%u",
-							 len, inet_ntoa( sin->sin_addr ), ntohs( sin->sin_port ) );
 					struct pbuf * pbuf = pbuf_alloc( PBUF_TRANSPORT, len, PBUF_RAM );
-					LOG_INF( "pbuf_alloc returns %p", pbuf );
 
 					if( pbuf != NULL )
 					{
@@ -262,49 +341,30 @@
 
 						ip_addr_t from_address;
 						from_address.addr = sin->sin_addr.s_addr;
-						snmp_receive( ( void * ) udp_socket, pbuf, &from_address, sin->sin_port );
+						snmp_receive( (void*) udp_socket, pbuf, &from_address, sin->sin_port);
 						pbuf_free (pbuf);
 					}
-					//snmp_send_trap_test();
-					{
-						extern void snmp_send_zbus ();
-						snmp_send_zbus();
-					}
-				}
-			}
-		} while( 1 );
+				} /* if (len > 0 && index == 0) */
+			} /* FD_ISSET */
+		} /* for (int index = 0 */
 	}
 
-/** SNMP netconn API worker thread */
-	static void snmp_zephyr_thread( void * arg1,
-									void * arg2,
-									void * arg3 )
+/**
+ * Starts SNMP Agent.
+ */
+	void snmp_init(void)
 	{
-		LWIP_UNUSED_ARG( arg1 );
-		LWIP_UNUSED_ARG( arg2 );
-		LWIP_UNUSED_ARG( arg3 );
-		socket_set_t socket_set;
-
 		wait_for_ethernet();
-
-		/* Initialise a socket set to select 2 sockets. */
-		memset (&socket_set, 0, sizeof socket_set);
 
 		/* Create the sockets. */
 		socket_set.socket_161 = create_socket(LWIP_IANA_PORT_SNMP);
 		socket_set.socket_162 = create_socket(LWIP_IANA_PORT_SNMP_TRAP);
 
-		FD_ZERO(&socket_set.read_set);
-		FD_SET(socket_set.socket_161, &socket_set.read_set);
-		FD_SET(socket_set.socket_162, &socket_set.read_set);
-		socket_set.select_max = max_int(socket_set.socket_161, socket_set.socket_162) + 1;
-
-//		socket_set.timeout.tv_sec = 5;
-
 		/* The lwIP SNMP driver owns a socket for traps 'snmp_traps_handle'. */
 		snmp_traps_handle = ( void * ) socket_set.socket_162;
 
-		loop_for_ever(&socket_set);
+		socket_set.timeout.tv_sec = 0;
+		socket_set.timeout.tv_usec = 10000U;
 	}
 
 	err_t snmp_sendto( void * handle,
@@ -312,34 +372,32 @@
 					   const ip_addr_t * dst,
 					   u16_t port )
 	{
-		err_t result;
+		int rc; /* Store the result of sendto(). */
 		struct sockaddr client_addr;
-		struct sockaddr_in * client_addr_in = ( struct sockaddr_in * ) &client_addr;
-		socklen_t client_addr_len = sizeof( client_addr );
+		struct sockaddr_in * client_addr_in = (struct sockaddr_in *) &client_addr;
+		socklen_t client_addr_len = sizeof(client_addr);
 
 		client_addr_in->sin_addr.s_addr = dst->addr;
-		client_addr_in->sin_port = port; // ntohs (port);
+		client_addr_in->sin_port = ntohs (port);
 		client_addr_in->sin_family = AF_INET;
 		// snmp_sendto: hnd = 8 port = 162, IP=C0A80213, len = 65
-		zephyr_log("snmp_sendto: hnd = %d port = %u, IP=%08X, len = %d\n",
-			(int) handle, port, client_addr_in->sin_addr.s_addr, p->len);
 
-		result = sendto( ( int ) handle, p->payload, p->len, 0, &client_addr, client_addr_len );
+		rc = sendto ((int) handle, p->payload, p->len, 0, &client_addr, client_addr_len);
+		zephyr_log("snmp_sendto: hnd = %d port = %u, IP=%s, len = %d, rc %d\n",
+			(int) handle, port, inet_ntoa(client_addr_in->sin_addr), p->len, rc);
 
-		return result;
+		return rc;
 	}
 
 	u8_t snmp_get_local_ip_for_dst( void * handle,
 									const ip_addr_t * dst,
 									ip_addr_t * result )
 	{
-//		struct netif * dst_if;
 		const ip_addr_t * dst_ip = dst;
 		struct in_addr in_addr;
 
 		in_addr.s_addr = dst->addr;
-        zephyr_log ("snmp_get_local_ip_for_dst: dst->addr = %s\n",
-			inet_ntoa(in_addr));
+//      zephyr_log ("snmp_get_local_ip_for_dst: dst->addr = %s\n", inet_ntoa(in_addr));
 		ip_addr_copy( *result, *dst_ip );
 
 		return 1;
@@ -354,25 +412,6 @@
 		}
 	}
 
-/**
- * Starts SNMP Agent.
- */
-	static K_KERNEL_STACK_DEFINE( snmp_stack, SNMP_STACK_SIZE );
-	void snmp_init( void )
-	{
-//		snmp_thread = k_thread_create(
-//			&snmp_thread_data,      /* struct k_thread * new_thread, */
-//			snmp_stack,             /* k_thread_stack_t * stack, */
-//			SNMP_STACK_SIZE,        /* size_t 	stack_size, */
-//			snmp_zephyr_thread,     /* k_thread_entry_t entry, */
-//			NULL,                   /* void * p1, */
-//			NULL,                   /* void * p2, */
-//			NULL,                   /* void * p3, */
-//			SNMP_THREAD_PRIO,       /* int prio, */
-//			0U,                     /* uint32_t options, */
-//			Z_TIMEOUT_MS( 100U ) ); /* k_timeout_t delay */
-	}
-K_THREAD_DEFINE(snmp_zephyr, SNMP_STACK_SIZE, snmp_zephyr_thread, NULL, NULL, NULL, SNMP_THREAD_PRIO, K_ESSENTIAL, 0);
 	void * mem_malloc( mem_size_t size )
 	{
 		return k_malloc( size );
@@ -413,20 +452,11 @@ K_THREAD_DEFINE(snmp_zephyr, SNMP_STACK_SIZE, snmp_zephyr_thread, NULL, NULL, NU
 
 #endif /* LWIP_SNMP && SNMP_USE_ZEPHYR */
 
-/*
- * 0000   30 26 02 01 00 04 06 70 75 62 6c 69 63 a0 19 02   0&.....public...
- *     hh hh hh hh vv        p  u  b  l  i  c
- * 0010   01 26 02 01 00 02 01 00 30 0e 30 0c 06 08 2b 06   .&......0.0...+.
- *        RI
- * 0020   01 02 01 01 02 00 05 00                           ........
- *
- *
- */
 size_t zephyr_log( const char * format,
 				 ... )
 {
 	va_list args;
-	char toprint[ 201 ];
+	static char toprint[ 201 ];
 
 	va_start( args, format );
 	size_t rc = vsnprintf(toprint, sizeof toprint, format, args);
@@ -450,14 +480,19 @@ size_t zephyr_log( const char * format,
 	return rc;
 }
 
-const char * print_oid (char *buf, size_t buf_size, size_t oid_len, u32_t *oid_words)
+const char * print_oid (size_t oid_len, const u32_t *oid_words)
 {
 	int length = 0;
-	int index;
-	buf[0] = 0;
+	size_t index;
+	size_t count = (oid_len <= SNMP_MAX_OBJ_ID_LEN) ? oid_len : SNMP_MAX_OBJ_ID_LEN;
+	#define buf_size   128U
+	static char buf[buf_size];
 
-	length += snprintf (buf+length, sizeof buf-length, "%u", oid_words[0]);
-	for (index = 1; index < oid_len; index++) {
+	buf[0] = 0;
+	if (count > 0) {
+		length += snprintf (buf+length, sizeof buf-length, "%u", oid_words[0]);
+	}
+	for (index = 1; index < count; index++) {
 		length += snprintf (buf + length, buf_size - length, ".%u", oid_words[index]);
 	}
 	return buf;
