@@ -45,6 +45,7 @@
 #include "lwip/def.h"
 #include "lwip/ip_addr.h"
 #include "lwip/stats.h"
+#include "lwip/snmp.h"
 
 #if LWIP_SNMP_V3
 #include "lwip/apps/snmpv3.h"
@@ -322,9 +323,9 @@ snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t por
   if (err == ERR_OK) {
     if (request.request_type == SNMP_ASN1_CONTEXT_PDU_GET_RESP)	{
       if (request.error_status == SNMP_ERR_NOERROR)	{
-        zephyr_log( "snmp_receive: received a get-response\n" );
         snmp_vb_enumerator_err_t err;
         struct snmp_varbind vb;
+        zephyr_log( "snmp_receive: received a get-response\n" );
 
         memset( &vb, 0, sizeof vb );
         vb.value = request.value_buffer;
@@ -852,6 +853,7 @@ snmp_parse_inbound_frame(struct snmp_request *request)
   snmpv3_priv_algo_t priv;
 #endif
 
+  memset (&tlv, 0, sizeof tlv);
   IF_PARSE_EXEC(snmp_pbuf_stream_init(&pbuf_stream, request->inbound_pbuf, 0, request->inbound_pbuf->tot_len));
 
 //zephyr_log("snmp_parse 1 bytes %d\n", request->inbound_pbuf->tot_len);

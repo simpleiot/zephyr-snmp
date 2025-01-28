@@ -202,86 +202,12 @@
 
 		ip_addr_t dst;
 		struct in_addr in_addr;
-//		dst.addr = inet_addr("192.168.2.11");
 		dst.addr = inet_addr(ip_address);
 		
 		in_addr.s_addr = dst.addr;
 		
 		snmp_trap_dst_enable(0, true);
 		snmp_trap_dst_ip_set(0, &dst);
-	}
-
-	/* Define the OID for the enterprise object
-	   struct snmp_obj_id
-	   {
-	  	  u8_t len;
-	  	  u32_t id[SNMP_MAX_OBJ_ID_LEN];
-	   };
-	*/
-
-	#define ENTERPRISE_OID {7, {1,3,6,1,4,1,12345} } // Example OID, replace with actual
-
-	// Function to send SNMP trap
-	void send_snmp_trap(const char * ip_address)
-	{
-		snmp_prepare_trap_test(ip_address);
-
-  		struct snmp_varbind *varbinds = NULL;
-		struct snmp_obj_id eoid = ENTERPRISE_OID; // Set enterprise OID
-		s32_t generic_trap = 6; // Generic trap code (e.g., 6 for enterprise specific)
-		s32_t specific_trap = 1; // Specific trap code (customize as needed)
-
-		// Allocate memory for varbinds, about 220 bytes
-		// It will allocate SNMP_MAX_OBJ_ID_LEN (50) uint32's.
-		varbinds = (struct snmp_varbind *)mem_malloc(sizeof(struct snmp_varbind));
-/*
-Simple Network Management Protocol
-    version: version-1 (0)
-    community: private
-    data: trap (4)
-        trap
-            enterprise: 1.3.6.1.2.1.1.4 (iso.3.6.1.2.1.1.4)
-            agent-addr: 192.168.56.1
-            generic-trap: enterpriseSpecific (6)
-            specific-trap: 0
-            time-stamp: 3246732727
-            variable-bindings: 0 items
-0000   30 2c 02 01 00 04 07 70 72 69 76 61 74 65 a4 1e   0,.....private..
-0010   06 07 2b 06 01 02 01 01 04 40 04 c0 a8 38 01 02   ..+......@...8..
-0020   01 06 02 01 00 43 05 00 c1 85 35 b7 30 00         .....C....5.0.
-*/
-		if (varbinds != NULL) {
-			int index;
-			// Set up varbinds
-			varbinds->oid.len = 8;// Length of OID
-
-			varbinds->oid.id[0] = 1;
-			varbinds->oid.id[1] = 3;
-			varbinds->oid.id[2] = 6;
-			varbinds->oid.id[3] = 1;
-			varbinds->oid.id[4] = 2;
-			varbinds->oid.id[5] = 1;
-			varbinds->oid.id[6] = 1;
-			varbinds->oid.id[7] = 4;
-
-			varbinds->type = SNMP_ASN1_TYPE_UNSIGNED32; // Type of the variable
-			u32_t value = 100;                   // Example value to send
-			varbinds->value = (void *)&value;    // Pointer to value
-			varbinds->value_len = sizeof(value); // Length of value
-
-			err_t err = snmp_send_trap(&eoid, generic_trap, specific_trap, varbinds);
-			
-			if (err == ERR_OK) {
-				zephyr_log("SNMP trap sent successfully.\n");
-			} else {
-				zephyr_log("Failed to send SNMP trap: %d\n", err);
-			}
-
-			// Free allocated memory for varbinds
-			mem_free(varbinds);
-		} else {
-			zephyr_log("Memory allocation failed for varbinds.\n");
-		}
 	}
 
 	static int max_int(int left, int right)
