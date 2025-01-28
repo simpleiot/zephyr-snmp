@@ -153,7 +153,8 @@ struct snmp_request {
 #endif
 
 //u8_t value_buffer[SNMP_MAX_VALUE_SIZE];
-#define SNMP_VALUE_BUFFER_SIZE   200
+/* _HT_ I think that a length of 128 should be supported. */
+#define SNMP_VALUE_BUFFER_SIZE   64
 
   u8_t value_buffer[SNMP_VALUE_BUFFER_SIZE];
 };

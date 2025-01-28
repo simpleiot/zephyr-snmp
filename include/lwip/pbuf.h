@@ -5,6 +5,10 @@
 
 #define LWIP_PBUF_H
 
+#ifdef __cplusplus
+	extern "C" {
+#endif
+
 #define PBUF_TYPE_ALLOC_SRC_MASK_STD_HEAP           0x00
 #define PBUF_TYPE_ALLOC_SRC_MASK_STD_MEMP_PBUF      0x01
 #define PBUF_TYPE_ALLOC_SRC_MASK_STD_MEMP_PBUF_POOL 0x02
@@ -114,6 +118,10 @@ struct pbuf * pbuf_alloc_reference(void *payload, u16_t length, pbuf_type type);
 
 #define pbuf_get_allocsrc( p )            ( ( p )->type_internal & PBUF_TYPE_ALLOC_SRC_MASK )
 #define pbuf_match_allocsrc( p, type )    ( pbuf_get_allocsrc( p ) == ( ( type ) & PBUF_TYPE_ALLOC_SRC_MASK ) )
+
+#ifdef __cplusplus
+	} /* extern "C" */
+#endif
 
 #endif /* LWIP_PBUF_H */
 

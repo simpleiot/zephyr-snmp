@@ -247,7 +247,8 @@ snmp_prepare_trap_oid(struct snmp_obj_id *dest_snmp_trap_oid, const struct snmp_
       MEMCPY(dest_snmp_trap_oid, eoid, sizeof(*dest_snmp_trap_oid));
     }
     if (dest_snmp_trap_oid->len + 2 < SNMP_MAX_OBJ_ID_LEN) {
-      dest_snmp_trap_oid->id[dest_snmp_trap_oid->len++] = 0;
+// _HT_ I can not find documentation about this inserted zero:
+//    dest_snmp_trap_oid->id[dest_snmp_trap_oid->len++] = 0;
       dest_snmp_trap_oid->id[dest_snmp_trap_oid->len++] = specific_trap;
     } else {
       err = ERR_MEM;
@@ -307,6 +308,7 @@ snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16
   /* allocate pbuf(s) */
   p = pbuf_alloc(PBUF_TRANSPORT, tot_len, PBUF_RAM);
   if (p != NULL) {
+    int rc;
     struct snmp_pbuf_stream pbuf_stream;
     snmp_pbuf_stream_init(&pbuf_stream, p, 0, tot_len);
 
@@ -318,9 +320,13 @@ snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16
     snmp_stats.outpkts++;
 
     /** send to the TRAP destination */
-    err = snmp_sendto(snmp_traps_handle, p, dip, LWIP_IANA_PORT_SNMP_TRAP);
+    rc = snmp_sendto(snmp_traps_handle, p, dip, LWIP_IANA_PORT_SNMP_TRAP);
+    if (rc <= 0) {
+		err = ERR_CONN;
+	}
     pbuf_free(p);
   } else {
+	zephyr_log ("snmp_send_msg: pbuf_alloc failed\n");
     err = ERR_MEM;
   }
   return err;
@@ -359,20 +365,26 @@ snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap *trap_msg,
                                                        NULL,                            /* *next */
                                                        NULL,                            /* *prev */
                                                        {                                /* oid */
-                                                         8,                             /* oid len */
-                                                         {1, 3, 6, 1, 2, 1, 1, 3}       /* oid for sysUpTime */
+                                                         9,                             /* oid len */
+                                                         {1, 3, 6, 1, 2, 1, 1, 3, 0}    /* oid for sysUpTime (1.3.6.1.2.1.1.3) */
                                                        },
                                                        SNMP_ASN1_TYPE_TIMETICKS,        /* type */
                                                        sizeof(u32_t),                   /* value_len */
                                                        NULL                             /* value */
                                                      },
-                                                     /* Second varbind is used to store snmpTrapOID */
+						 /* 1.3.6.1.6.3.1.1.4.1.0
+						  * Second varbind is used to store snmpTrapOID
+						  * "The authoritative identification of the notification
+						  * currently being sent. This variable occurs as
+						  * the second varbind in every SNMPv2-Trap-PDU and
+						  * InformRequest-PDU."
+						  */
                                                      {
                                                        NULL,                            /* *next */
                                                        NULL,                            /* *prev */
                                                        {                                /* oid */
-                                                         10,                            /* oid len */
-                                                         {1, 3, 6, 1, 6, 3, 1, 1, 4, 1} /* oid for snmpTrapOID */
+                                                         11,                            /* oid len */
+                                                         {1, 3, 6, 1, 6, 3, 1, 1, 4, 1, 0} /* oid for snmpTrapOID (1.3.6.1.6.3.1.1.4.1.0) */
                                                        },
                                                        SNMP_ASN1_TYPE_OBJECT_ID,        /* type */
                                                        0,                               /* value_len */
@@ -411,6 +423,7 @@ snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap *trap_msg,
         snmp_prepare_necessary_msg_fields(trap_msg, eoid, generic_trap, specific_trap, varbinds);
 
         /* pass 0, calculate length fields */
+        /* _HT_ The next assignment to tot_len seems reduncant: */
         tot_len = snmp_trap_varbind_sum(trap_msg, varbinds);
         tot_len = snmp_trap_header_sum(trap_msg, tot_len);
 

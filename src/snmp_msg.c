@@ -45,6 +45,7 @@
 #include "lwip/def.h"
 #include "lwip/ip_addr.h"
 #include "lwip/stats.h"
+#include "lwip/snmp.h"
 
 #if LWIP_SNMP_V3
 #include "lwip/apps/snmpv3.h"
@@ -284,6 +285,22 @@ static void snmp_execute_write_callbacks(struct snmp_request *request);
 /* implementation */
 /* ----------------------------------------------------------------------- */
 
+static const char *request_name (int request)
+{
+	switch (request) {
+	case SNMP_ASN1_CONTEXT_PDU_GET_REQ:       return "GET_REQ";       // 0
+	case SNMP_ASN1_CONTEXT_PDU_GET_NEXT_REQ:  return "GET_NEXT_REQ";  // 1
+	case SNMP_ASN1_CONTEXT_PDU_GET_RESP:      return "GET_RESP";      // 2
+	case SNMP_ASN1_CONTEXT_PDU_SET_REQ:       return "SET_REQ";       // 3
+	case SNMP_ASN1_CONTEXT_PDU_TRAP:          return "TRAP";          // 4
+	case SNMP_ASN1_CONTEXT_PDU_GET_BULK_REQ:  return "GET_BULK_REQ";  // 5
+	case SNMP_ASN1_CONTEXT_PDU_INFORM_REQ:    return "INFORM_REQ";    // 6
+	case SNMP_ASN1_CONTEXT_PDU_V2_TRAP:       return "V2_TRAP";       // 7
+	case SNMP_ASN1_CONTEXT_PDU_REPORT:        return "REPORT";        // 8
+	}
+	return "GET_UNKNOWN";
+}
+
 void
 snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t port)
 {
@@ -299,14 +316,16 @@ snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t por
   snmp_stats.inpkts++;
 
   err = snmp_parse_inbound_frame( &request );
-  zephyr_log( "snmp_receive: snmp_parse returns %d\n", err );
+  zephyr_log( "snmp_receive: snmp_parse returns %02X type %s\n",
+    err,
+	request_name (request.request_type));
 
   if (err == ERR_OK) {
     if (request.request_type == SNMP_ASN1_CONTEXT_PDU_GET_RESP)	{
       if (request.error_status == SNMP_ERR_NOERROR)	{
-        zephyr_log( "snmp_receive: received a response\n" );
         snmp_vb_enumerator_err_t err;
         struct snmp_varbind vb;
+        zephyr_log( "snmp_receive: received a get-response\n" );
 
         memset( &vb, 0, sizeof vb );
         vb.value = request.value_buffer;
@@ -316,13 +335,8 @@ snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t por
         while( request.error_status == SNMP_ERR_NOERROR ) {
           err = snmp_vb_enumerator_get_next( &request.inbound_varbind_enumerator, &vb );
           if( err == SNMP_VB_ENUMERATOR_ERR_OK ) {
-            char buf[ 128 ];
-            extern const char * print_oid (char * buf,
-                                           size_t buf_size,
-                                           size_t oid_len,
-                                           u32_t * oid_words);
-            print_oid( buf, sizeof buf, vb.oid.len, vb.oid.id );
-            LWIP_DEBUGF( SNMP_DEBUG, ( "Request %s\n", buf ) );
+            zephyr_log("getRequest %s\n",
+            print_oid(vb.oid.len, vb.oid.id));
             break;
           }
         }
@@ -416,8 +430,10 @@ snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t por
         err = snmp_complete_outbound_frame(&request);
 
         if (err == ERR_OK) {
-          err = snmp_sendto(request.handle, request.outbound_pbuf, request.source_ip, request.source_port);
-
+          int rc = snmp_sendto(request.handle, request.outbound_pbuf, request.source_ip, request.source_port);
+          if (rc <= 0) {
+            err = ERR_CONN;
+          }
           if ((request.request_type == SNMP_ASN1_CONTEXT_PDU_SET_REQ)
               && (request.error_status == SNMP_ERR_NOERROR)
               && (snmp_write_callback != NULL)) {
@@ -548,15 +564,8 @@ snmp_process_get_request( struct snmp_request * request )
     err = snmp_vb_enumerator_get_next( &request->inbound_varbind_enumerator, &vb );
 
     if( err == SNMP_VB_ENUMERATOR_ERR_OK ) {
-      {
-         char buf[ 128 ];
-         extern const char * print_oid(char * buf,
-                                       size_t buf_size,
-                                       size_t oid_len,
-                                       u32_t * oid_words );
-         print_oid( buf, sizeof buf, vb.oid.len, vb.oid.id );
-         LWIP_DEBUGF( SNMP_DEBUG, ( "Request %s\n", buf ) );
-      }
+      zephyr_log ("getRequest %s\n",
+      print_oid(vb.oid.len, vb.oid.id));
 
       if ((vb.type == SNMP_ASN1_TYPE_NULL) && (vb.value_len == 0)) {
         snmp_process_varbind(request, &vb, 0);
@@ -844,6 +853,7 @@ snmp_parse_inbound_frame(struct snmp_request *request)
   snmpv3_priv_algo_t priv;
 #endif
 
+  memset (&tlv, 0, sizeof tlv);
   IF_PARSE_EXEC(snmp_pbuf_stream_init(&pbuf_stream, request->inbound_pbuf, 0, request->inbound_pbuf->tot_len));
 
 //zephyr_log("snmp_parse 1 bytes %d\n", request->inbound_pbuf->tot_len);
@@ -881,6 +891,7 @@ snmp_parse_inbound_frame(struct snmp_request *request)
     zephyr_log("snmp_parse: unsupported SNMP v%d\n", s32_value);
     /* unsupported SNMP version */
     snmp_stats.inbadversions++;
+    /* Returning a "err_enum_t" where a "err_t" is expected */
     return ERR_ARG;
   }
   request->version = (u8_t)s32_value;
@@ -1234,32 +1245,37 @@ snmp_parse_inbound_frame(struct snmp_request *request)
 
   /* validate PDU type */
   switch (tlv.type) {
-    case (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_GET_REQ):
-      /* GetRequest PDU */
-      snmp_stats.ingetrequests++;
-      break;
-    case (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_GET_NEXT_REQ):
-      /* GetNextRequest PDU */
-      snmp_stats.ingetnexts++;
-      break;
-    case (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_GET_BULK_REQ):
-      /* GetBulkRequest PDU */
-      if (request->version < SNMP_VERSION_2c) {
-        /* RFC2089: invalid, drop packet */
-        return ERR_ARG;
-      }
-      break;
-    case (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_SET_REQ):
-      /* SetRequest PDU */
-      snmp_stats.insetrequests++;
-      break;
-    case (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_GET_RESP):
+	case /* 0xA0 */ (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_GET_REQ):
+	  /* GetRequest PDU */
+	  snmp_stats.ingetrequests++;
+	  break;
+	case /* 0xA1 */ (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_GET_NEXT_REQ):
+	  /* GetNextRequest PDU */
+	  snmp_stats.ingetnexts++;
+	  break;
+	case /* 0xA5 */ (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_GET_BULK_REQ):
+	  /* GetBulkRequest PDU */
+	  if (request->version < SNMP_VERSION_2c) {
+		/* RFC2089: invalid, drop packet */
+		return ERR_ARG;
+	  }
+	  break;
+	case /* 0xA3 */ (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_SET_REQ):
+	  /* SetRequest PDU */
+	  snmp_stats.insetrequests++;
+	  break;
+	case /* 0xA2 */ (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_GET_RESP):
       /* GetResponse PDU */
       snmp_stats.ingetresponses++;
       break;
+	case /* 0xA7 */ (SNMP_ASN1_CLASS_CONTEXT | SNMP_ASN1_CONTENTTYPE_CONSTRUCTED | SNMP_ASN1_CONTEXT_PDU_V2_TRAP):
+	  /* trapVersion2c PDU */
+	  snmp_stats.intraps++;
+	  LWIP_DEBUGF(SNMP_DEBUG, ("receiving V2c traps is not supported\n"));
+	  return ERR_ARG;
     default:
       /* unsupported input PDU for this agent (no parse error) */
-      LWIP_DEBUGF(SNMP_DEBUG, ("Unknown/Invalid SNMP PDU type received: %d\n", tlv.type)); \
+      LWIP_DEBUGF(SNMP_DEBUG, ("Unknown/Invalid SNMP PDU type received: %d (0x%02X)\n", tlv.type, tlv.type)); \
       return ERR_ARG;
   }
   request->request_type = tlv.type & SNMP_ASN1_DATATYPE_MASK;
