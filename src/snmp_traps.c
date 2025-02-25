@@ -319,8 +319,10 @@ snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16
     snmp_stats.outtraps++;
     snmp_stats.outpkts++;
 
+    /* snmp_sendto() wants a network-endian port number. */
+    u16_t port = ntohs(LWIP_IANA_PORT_SNMP_TRAP);
     /** send to the TRAP destination */
-    rc = snmp_sendto(snmp_traps_handle, p, dip, LWIP_IANA_PORT_SNMP_TRAP);
+    rc = snmp_sendto(snmp_traps_handle, p, dip, port);
     if (rc <= 0) {
 		err = ERR_CONN;
 	}
