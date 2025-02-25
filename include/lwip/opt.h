@@ -132,4 +132,6 @@ extern struct netif *netif_list;
   LWIP_PLATFORM_ERROR(message); handler;}} while(0)
 #endif /* LWIP_ERROR */
 
+const char * print_oid (size_t oid_len, const u32_t *oid_words);
+
 #endif /* LWIP_OPT_H */

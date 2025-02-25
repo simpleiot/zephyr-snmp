@@ -39,6 +39,8 @@
 
 #include "lwip/opt.h"
 
+#include <arpa/inet.h>
+
 /**
  * @defgroup snmp_opts Options
  * @ingroup snmp

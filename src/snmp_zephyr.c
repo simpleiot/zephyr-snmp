@@ -280,19 +280,25 @@
  */
 	void snmp_init(void)
 	{
-		wait_for_ethernet();
+		static int has_created = false;
+		if (has_created == false) {
+			has_created = true;
+			wait_for_ethernet();
 
-		/* Create the sockets. */
-		socket_set.socket_161 = create_socket(LWIP_IANA_PORT_SNMP);
-		socket_set.socket_162 = create_socket(LWIP_IANA_PORT_SNMP_TRAP);
+			/* Create the sockets. */
+			socket_set.socket_161 = create_socket(LWIP_IANA_PORT_SNMP);
+			socket_set.socket_162 = create_socket(LWIP_IANA_PORT_SNMP_TRAP);
 
-		/* The lwIP SNMP driver owns a socket for traps 'snmp_traps_handle'. */
-		snmp_traps_handle = ( void * ) socket_set.socket_162;
+			/* The lwIP SNMP driver owns a socket for traps 'snmp_traps_handle'. */
+			snmp_traps_handle = ( void * ) socket_set.socket_162;
 
-		socket_set.timeout.tv_sec = 0;
-		socket_set.timeout.tv_usec = 10000U;
+			socket_set.timeout.tv_sec = 0;
+			socket_set.timeout.tv_usec = 10000U;
+		}
 	}
 
+	/* send a UDP packet to the LAN using a network-endian
+	 * port number and IP-address. */
 	err_t snmp_sendto( void * handle,
 					   struct pbuf * p,
 					   const ip_addr_t * dst,
@@ -304,13 +310,13 @@
 		socklen_t client_addr_len = sizeof(client_addr);
 
 		client_addr_in->sin_addr.s_addr = dst->addr;
-		client_addr_in->sin_port = ntohs (port);
+		client_addr_in->sin_port = port;
 		client_addr_in->sin_family = AF_INET;
 		// snmp_sendto: hnd = 8 port = 162, IP=C0A80213, len = 65
 
 		rc = sendto ((int) handle, p->payload, p->len, 0, &client_addr, client_addr_len);
 		zephyr_log("snmp_sendto: hnd = %d port = %u, IP=%s, len = %d, rc %d\n",
-			(int) handle, port, inet_ntoa(client_addr_in->sin_addr), p->len, rc);
+			(int) handle, ntohs (port), inet_ntoa(client_addr_in->sin_addr), p->len, rc);
 
 		return rc;
 	}
@@ -422,4 +428,18 @@ const char * print_oid (size_t oid_len, const u32_t *oid_words)
 		length += snprintf (buf + length, buf_size - length, ".%u", oid_words[index]);
 	}
 	return buf;
+}
+
+/* Use this function while stepping through the lwIP code. */
+const char *leafNodeName (unsigned aType)
+{
+	switch (aType) {
+	case SNMP_NODE_TREE:         return "Tree";         // 0x00
+/* predefined leaf node types */
+	case SNMP_NODE_SCALAR:       return "Scalar";       // 0x01
+	case SNMP_NODE_SCALAR_ARRAY: return "Scalar-array"; // 0x02
+	case SNMP_NODE_TABLE:        return "Table";        // 0x03
+	case SNMP_NODE_THREADSYNC:   return "Threadsync";   // 0x04
+	}
+	return "Unknown";
 }
