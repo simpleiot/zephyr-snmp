@@ -104,38 +104,6 @@
 	#define CHAR_BUF_LEN  512 /* declared on the heap at first time use. */
 	char char_buffer[CHAR_BUF_LEN];
 
-
-	/* Wait for the negotiation of the DHCP client.
-	 * It will sleep for 500 ms and poll 'dhcpv4.state'.
-	 * It will wait at most 12 seconds. */
-	static void wait_for_ethernet()
-	{
-		k_sleep( Z_TIMEOUT_MS( 1000 ) );
-
-		struct net_if * iface = net_if_get_default();
-
-		if( iface != NULL )
-		{
-			int counter;
-			enum net_dhcpv4_state last_state = NET_DHCPV4_DISABLED;
-			for(counter = 0; counter< 24 ; counter++)
-			{
-				int is_up = net_if_is_up( iface );
-				if (last_state != iface->config.dhcpv4.state) {
-					last_state = iface->config.dhcpv4.state;
-					zephyr_log( "DHCP: Name \"%s\" UP: %s DHCP %s\n",
-								iface->if_dev->dev->name,
-								is_up ? "true" : "false",
-								net_dhcpv4_state_name(iface->config.dhcpv4.state));
-				}
-				if (iface->config.dhcpv4.state >= NET_DHCPV4_REBINDING) {
-					break;
-				}
-				k_sleep( Z_TIMEOUT_MS( 500 ) );
-			}
-		}
-	}
-
 	static int create_socket(unsigned port)
 	{
 		int socket_fd = -1;
@@ -283,7 +251,6 @@
 		static int has_created = false;
 		if (has_created == false) {
 			has_created = true;
-			wait_for_ethernet();
 
 			/* Create the sockets. */
 			socket_set.socket_161 = create_socket(LWIP_IANA_PORT_SNMP);
