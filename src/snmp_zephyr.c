@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <stdarg.h>
 
 #ifndef __ZEPHYR__
 
@@ -58,6 +59,7 @@
 #include <app_version.h>
 
 #include "lwip/apps/snmp_opts.h"
+#include "lwip/apps/zenmp_zephyr.h"
 
 #if LWIP_SNMP && SNMP_USE_ZEPHYR
 
@@ -104,38 +106,6 @@
 	#define CHAR_BUF_LEN  512 /* declared on the heap at first time use. */
 	char char_buffer[CHAR_BUF_LEN];
 
-
-	/* Wait for the negotiation of the DHCP client.
-	 * It will sleep for 500 ms and poll 'dhcpv4.state'.
-	 * It will wait at most 12 seconds. */
-	static void wait_for_ethernet()
-	{
-		k_sleep( Z_TIMEOUT_MS( 1000 ) );
-
-		struct net_if * iface = net_if_get_default();
-
-		if( iface != NULL )
-		{
-			int counter;
-			enum net_dhcpv4_state last_state = NET_DHCPV4_DISABLED;
-			for(counter = 0; counter< 24 ; counter++)
-			{
-				int is_up = net_if_is_up( iface );
-				if (last_state != iface->config.dhcpv4.state) {
-					last_state = iface->config.dhcpv4.state;
-					zephyr_log( "DHCP: Name \"%s\" UP: %s DHCP %s\n",
-								iface->if_dev->dev->name,
-								is_up ? "true" : "false",
-								net_dhcpv4_state_name(iface->config.dhcpv4.state));
-				}
-				if (iface->config.dhcpv4.state >= NET_DHCPV4_REBINDING) {
-					break;
-				}
-				k_sleep( Z_TIMEOUT_MS( 500 ) );
-			}
-		}
-	}
-
 	static int create_socket(unsigned port)
 	{
 		int socket_fd = -1;
@@ -150,7 +120,7 @@
 			.sin6_port   = htons( port ),
 		};
 
-		socket_fd = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
+		socket_fd = zsock_socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
 
 		if( socket_fd < 0 )
 		{
@@ -163,14 +133,14 @@
 				socket_fd,
 				(port == LWIP_IANA_PORT_SNMP_TRAP) ? "traps" : "server");
 
-			ret = getsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, &optlen );
+			ret = zsock_getsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, &optlen );
 
 			if (ret == 0 && opt != 0)
 			{
 				zephyr_log( "create_socket: IPV6_V6ONLY option is on, turning it off.\n" );
 
 				opt = 0;
-				ret = setsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY,
+				ret = zsock_setsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY,
 								  &opt, optlen );
 
 				if( ret < 0 )
@@ -182,10 +152,10 @@
 			struct timeval tv;
 			tv.tv_sec = 0;
 			tv.tv_usec = 10000;
-			int rc = setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+			int rc = zsock_setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 			zephyr_log( "process_udp: setsockopt %d\n", rc);
 
-			if( bind( socket_fd, ( struct sockaddr * ) &bind_addr, sizeof( bind_addr ) ) < 0 )
+			if( zsock_bind( socket_fd, ( struct sockaddr * ) &bind_addr, sizeof( bind_addr ) ) < 0 )
 			{
 				zephyr_log( "create_socket: bind: %d\n", errno );
 				go_sleep( 1 );
@@ -239,7 +209,7 @@
 				struct sockaddr_in * sin = (struct sockaddr_in *) &client_addr;
 				socklen_t client_addr_len = sizeof client_addr;
 				int len;
-				len = recvfrom( udp_socket,
+				len = zsock_recvfrom( udp_socket,
 								char_buffer,
 								sizeof char_buffer,
 								0, // flags
@@ -283,7 +253,6 @@
 		static int has_created = false;
 		if (has_created == false) {
 			has_created = true;
-			wait_for_ethernet();
 
 			/* Create the sockets. */
 			socket_set.socket_161 = create_socket(LWIP_IANA_PORT_SNMP);
@@ -314,7 +283,7 @@
 		client_addr_in->sin_family = AF_INET;
 		// snmp_sendto: hnd = 8 port = 162, IP=C0A80213, len = 65
 
-		rc = sendto ((int) handle, p->payload, p->len, 0, &client_addr, client_addr_len);
+		rc = zsock_sendto ((int) handle, p->payload, p->len, 0, &client_addr, client_addr_len);
 		zephyr_log("snmp_sendto: hnd = %d port = %u, IP=%s, len = %d, rc %d\n",
 			(int) handle, ntohs (port), inet_ntoa(client_addr_in->sin_addr), p->len, rc);
 
