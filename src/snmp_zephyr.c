@@ -59,7 +59,7 @@
 #include <app_version.h>
 
 #include "lwip/apps/snmp_opts.h"
-#include "lwip/apps/zenmp_zephyr.h"
+#include "lwip/apps/snmp_zephyr.h"
 
 #if LWIP_SNMP && SNMP_USE_ZEPHYR
 
@@ -190,6 +190,11 @@
 		return rc;
 	}
 
+	/**
+	 * @brief Check all open sockets and answer get request, get next, etc.
+	 *         The call will block for 10 ms, see socket_set.timeout.
+	 */
+
 	void snmp_loop()
 	{
 		int rc_select;
@@ -210,11 +215,11 @@
 				socklen_t client_addr_len = sizeof client_addr;
 				int len;
 				len = zsock_recvfrom( udp_socket,
-								char_buffer,
-								sizeof char_buffer,
-								0, // flags
-								&client_addr,
-								&client_addr_len );
+									  char_buffer,
+									  sizeof char_buffer,
+									  0, // flags
+									  &client_addr,
+									  &client_addr_len );
 				if (len > 0) {
 					int port = (index == 0) ? 161 : 162;
 					zephyr_log( "recv[%u]: %d bytes from %s:%u\n",
@@ -246,7 +251,7 @@
 	}
 
 /**
- * Starts SNMP Agent.
+ * @brief Starts SNMP Agent.
  */
 	void snmp_init(void)
 	{
