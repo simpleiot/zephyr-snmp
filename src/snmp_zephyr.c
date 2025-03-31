@@ -220,7 +220,7 @@
 									  0, // flags
 									  &client_addr,
 									  &client_addr_len );
-				if (len > 0) {
+				if (len > 0 && index < 2) {
 					int port = (index == 0) ? 161 : 162;
 					zephyr_log( "recv[%u]: %d bytes from %s:%u\n",
 						 port,
@@ -318,6 +318,8 @@
 		}
 	}
 
+	/* As part of the zephyr "port", we must define some
+	 * memory allocation. */
 	void * mem_malloc( mem_size_t size )
 	{
 		return k_malloc( size );
