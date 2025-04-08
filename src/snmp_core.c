@@ -186,6 +186,7 @@
 
 #include "lwip/apps/snmp.h"
 #include "lwip/apps/snmp_core.h"
+#include "lwip/apps/snmp_scalar.h"
 #include "snmp_core_priv.h"
 #include "lwip/netif.h"
 #include <string.h>
@@ -806,6 +807,9 @@ snmp_get_node_instance_from_oid(const u32_t *oid, u8_t oid_len, struct snmp_node
       }
 #endif
     }
+  } else {
+	/** No mib was found describing the given OID.
+	 */
   }
 
   return result;

@@ -66,14 +66,17 @@ struct snmp_varbind
   /** object value length */
   u16_t value_len;
   /** object value */
-  void *value;
+  /** _HT_ changed the meaningless and overused 'value'
+   * into a unique identifier 'object_value'.
+   */
+  void *object_value;
 };
 
 /**
  * @ingroup snmp_core
  * Agent setup, start listening to port 161.
  */
-void snmp_init(void);
+int snmp_init(void);
 void snmp_set_mibs(const struct snmp_mib **mibs, u8_t num_mibs);
 
 void snmp_set_device_enterprise_oid(const struct snmp_obj_id* device_enterprise_oid);

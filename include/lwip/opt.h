@@ -134,4 +134,7 @@ extern struct netif *netif_list;
 
 const char * print_oid (size_t oid_len, const u32_t *oid_words);
 
+/* The following function is "private", it will be called by the SNMP stack. */
+size_t snmp_private_call_handler(const char *prefix, void *value);
+
 #endif /* LWIP_OPT_H */

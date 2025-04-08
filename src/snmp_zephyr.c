@@ -1,6 +1,6 @@
 /**
  * @file
- * SNMP netconn frontend.
+ * SNMP zephyr frontend.
  */
 
 /*
@@ -37,18 +37,8 @@
 #include <errno.h>
 #include <stdarg.h>
 
-#ifndef __ZEPHYR__
-
-	#include <netinet/in.h>
-	#include <sys/socket.h>
-	#include <unistd.h>
-
-#else
-
-	#include <zephyr/net/socket.h>
-	#include <zephyr/kernel.h>
-
-#endif
+#include <zephyr/net/socket.h>
+#include <zephyr/kernel.h>
 
 #include <arpa/inet.h>
 #include <sys/select.h>
@@ -87,6 +77,9 @@
 /** Yes, a global variable. */
 	struct udp_pcb * udp_pcbs;
 
+/** The first entry in a liinked list of handler entries. */
+	static struct snmp_handler_entry * first_handler;
+
 /** Global variable containing lwIP internal statistics. Add this to your debugger's watchlist. */
 	struct stats_ lwip_stats;
 
@@ -96,12 +89,10 @@
 /** The default network interface. */
 	struct netif * netif_default;
 
-	static void go_sleep();
-
-/** Wake up the thread 'z_snmp_client' in order to send a trap. */
-	void snmp_send_zbus(void);
-
 	static socket_set_t socket_set;
+
+/** 'has_sockets' is true when all UD sockets are created. */
+	static bool has_sockets = 0;
 
 	#define CHAR_BUF_LEN  512 /* declared on the heap at first time use. */
 	char char_buffer[CHAR_BUF_LEN];
@@ -125,7 +116,6 @@
 		if( socket_fd < 0 )
 		{
 			zephyr_log( "create_socket: error: socket: %d errno: %d\n", socket_fd, errno );
-			go_sleep( 1 );
 		}
 		else
 		{
@@ -158,7 +148,6 @@
 			if( zsock_bind( socket_fd, ( struct sockaddr * ) &bind_addr, sizeof( bind_addr ) ) < 0 )
 			{
 				zephyr_log( "create_socket: bind: %d\n", errno );
-				go_sleep( 1 );
 			}
 		}
 		return socket_fd;
@@ -180,16 +169,6 @@
 		snmp_trap_dst_ip_set(0, &dst);
 	}
 
-	static int max_int(int left, int right)
-	{
-		int rc = left;
-		if (right > rc)
-		{
-			rc = right;
-		}
-		return rc;
-	}
-
 	/**
 	 * @brief Check all open sockets and answer get request, get next, etc.
 	 *         The call will block for 10 ms, see socket_set.timeout.
@@ -197,63 +176,70 @@
 
 	void snmp_loop()
 	{
-		int rc_select;
-		fd_set read_set; /* A set of file descriptors. */
-		FD_ZERO(&read_set);
-		FD_SET(socket_set.socket_161, &read_set);
-		FD_SET(socket_set.socket_162, &read_set);
-		socket_set.select_max = max_int(socket_set.socket_161, socket_set.socket_162) + 1;
+		int rc_poll;
 
-		rc_select = select(socket_set.select_max, &read_set, NULL, NULL, &(socket_set.timeout));
-		if (rc_select > 0) for (int index = 0; index < 2; index++)
+		if (!has_sockets) {
+			k_sleep(K_MSEC(5));
+			return;
+		}
+		struct pollfd fds[2];
+		
+		// Configure pollfd for UDP socket 161
+		fds[0].fd = socket_set.socket_161;
+		fds[0].events = POLLIN;
+		
+		// Configure pollfd for UDP socket 162
+		fds[1].fd = socket_set.socket_162;
+		fds[1].events = POLLIN;
+
+		rc_poll = poll(fds, 2, 200); // Wait 200 ms
+
+		if (rc_poll > 0) for (int index = 0; index < 2; index++)
 		{
 			int udp_socket = (index == 0) ? socket_set.socket_161 : socket_set.socket_162;
-			if (FD_ISSET(udp_socket, &read_set))
+			struct sockaddr client_addr;
+			struct sockaddr_in * sin = (struct sockaddr_in *) &client_addr;
+			socklen_t client_addr_len = sizeof client_addr;
+			int len;
+			len = zsock_recvfrom( udp_socket,
+								  char_buffer,
+								  sizeof char_buffer,
+								  0, // flags
+								  &client_addr,
+								  &client_addr_len );
+			if (len > 0 && index < 2) {
+				int port = (index == 0) ? 161 : 162;
+				zephyr_log( "recv[%u]: %d bytes from %s:%u\n",
+					 port,
+					 len,
+					 inet_ntoa(sin->sin_addr),
+					 ntohs(sin->sin_port));
+			}
+			if (len > 0) //  && index == 0)
 			{
-				struct sockaddr client_addr;
-				struct sockaddr_in * sin = (struct sockaddr_in *) &client_addr;
-				socklen_t client_addr_len = sizeof client_addr;
-				int len;
-				len = zsock_recvfrom( udp_socket,
-									  char_buffer,
-									  sizeof char_buffer,
-									  0, // flags
-									  &client_addr,
-									  &client_addr_len );
-				if (len > 0 && index < 2) {
-					int port = (index == 0) ? 161 : 162;
-					zephyr_log( "recv[%u]: %d bytes from %s:%u\n",
-						 port,
-						 len,
-						 inet_ntoa(sin->sin_addr),
-						 ntohs(sin->sin_port));
-				}
-				if (len > 0) //  && index == 0)
+				struct pbuf * pbuf = pbuf_alloc( PBUF_TRANSPORT, len, PBUF_RAM );
+
+				if( pbuf != NULL )
 				{
-					struct pbuf * pbuf = pbuf_alloc( PBUF_TRANSPORT, len, PBUF_RAM );
+					pbuf->next = NULL;
+					memcpy( pbuf->payload, char_buffer, len );
+					pbuf->tot_len = len;
+					pbuf->len = len;
+					pbuf->ref = 1;
 
-					if( pbuf != NULL )
-					{
-						pbuf->next = NULL;
-						memcpy( pbuf->payload, char_buffer, len );
-						pbuf->tot_len = len;
-						pbuf->len = len;
-						pbuf->ref = 1;
-
-						ip_addr_t from_address;
-						from_address.addr = sin->sin_addr.s_addr;
-						snmp_receive( (void*) udp_socket, pbuf, &from_address, sin->sin_port);
-						pbuf_free (pbuf);
-					}
-				} /* if (len > 0 && index == 0) */
-			} /* FD_ISSET */
+					ip_addr_t from_address;
+					from_address.addr = sin->sin_addr.s_addr;
+					snmp_receive( (void*) udp_socket, pbuf, &from_address, sin->sin_port);
+					pbuf_free (pbuf);
+				}
+			} /* if (len > 0 && index == 0) */
 		} /* for (int index = 0 */
 	}
 
 /**
- * @brief Starts SNMP Agent.
+ * @brief Create sockets, starts SNMP Agent.
  */
-	void snmp_init(void)
+	int snmp_init(void)
 	{
 		static int has_created = false;
 		if (has_created == false) {
@@ -267,8 +253,11 @@
 			snmp_traps_handle = ( void * ) socket_set.socket_162;
 
 			socket_set.timeout.tv_sec = 0;
-			socket_set.timeout.tv_usec = 10000U;
+			socket_set.timeout.tv_usec = 1000U;
+			has_sockets = (socket_set.socket_161 >= 0) && (socket_set.socket_162 >= 0);
 		}
+		first_handler = NULL;
+		return has_sockets;
 	}
 
 	/* send a UDP packet to the LAN using a network-endian
@@ -418,4 +407,75 @@ const char *leafNodeName (unsigned aType)
 	case SNMP_NODE_THREADSYNC:   return "Threadsync";   // 0x04
 	}
 	return "Unknown";
+}
+
+/*
+ *       ####          ###   ###   ##                     ##
+ *      #    #           #     #    #                      #
+ *     #     #           #     #    #                      #
+ *     #        ####     #     #    #####   ####    ####   #    #
+ *     #            #    #     #    #    #      #  #   ##  #   #
+ *     #        #####    #     #    #    #  #####  #       ####
+ *     #     # #    #    #     #    #    # #    #  #       #   #
+ *      #    # #    #    #     #    #    # #    #  #   ##  #    #
+ *       ####   ### ## ##### ##### ## ###   ### ##  ####  ##   ##
+ */
+
+static int match_length(const char *complete, const char *partial)
+{
+	int index;
+	for (index = 0; ; index++) {
+		char ch0 = complete[index];
+		char ch1 = partial[index];
+		if (!ch0 || !ch1) {
+			break;
+		}
+		if (ch0 != ch1) {
+			break;
+		}
+	}
+	return index;
+}
+
+void install_snmp_handler(struct snmp_handler_entry * new_entry)
+{
+	new_entry->next = NULL;
+	if (first_handler == NULL) {
+		first_handler = new_entry;
+	} else {
+		struct snmp_handler_entry * current = first_handler;
+		for (;;) {
+			/* assert that 'current != NULL ' */
+			if (current->next == NULL) {
+				current->next = new_entry;
+				break;
+			}
+			current = current->next;
+		}
+	}
+}
+
+size_t snmp_private_call_handler(const char *prefix, void *value_p)
+{
+	int value_length = 0;
+	struct snmp_handler_entry *entry = first_handler;
+	size_t plength = strlen (prefix);
+	/* 'value_p' points to an array of SNMP_VALUE_BUFFER_SIZE bytes. */
+	zephyr_log("snmp_private_call_handler: Looking for %s\n", prefix);
+
+	while (entry != NULL) {
+		if (entry->handler) {
+			int mlength = match_length(entry->prefix, prefix);
+			zephyr_log("Match \"%s\" %d/%d\n", entry->prefix, mlength, plength);
+			if (mlength >= plength || mlength == strlen (entry->prefix)) {
+				int value = entry->handler(prefix, entry);
+				value_length = sizeof value;
+				memcpy (value_p, &value, value_length);
+				break;
+			}
+		}
+		entry = entry->next;
+	}
+	zephyr_log ("snmp_private_call_handler (%s): %sfound\n", prefix, entry ? "" : "not ");
+	return value_length;
 }
