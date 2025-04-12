@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include <zephyr/net/socket.h>
 #include <zephyr/kernel.h>
@@ -54,7 +55,6 @@
 #if LWIP_SNMP && SNMP_USE_ZEPHYR
 
 	#include <string.h>
-/*#include "lwip/api.h" */
 	#include "lwip/ip.h"
 	#include "lwip/udp.h"
 	#include "snmp_msg.h"
@@ -179,7 +179,7 @@
 		int rc_poll;
 
 		if (!has_sockets) {
-			k_sleep(K_MSEC(5));
+			k_sleep(K_MSEC(200));
 			return;
 		}
 		struct pollfd fds[2];
@@ -215,7 +215,7 @@
 					 inet_ntoa(sin->sin_addr),
 					 ntohs(sin->sin_port));
 			}
-			if (len > 0) //  && index == 0)
+			if (len > 0)
 			{
 				struct pbuf * pbuf = pbuf_alloc( PBUF_TRANSPORT, len, PBUF_RAM );
 
@@ -278,8 +278,6 @@
 		// snmp_sendto: hnd = 8 port = 162, IP=C0A80213, len = 65
 
 		rc = zsock_sendto ((int) handle, p->payload, p->len, 0, &client_addr, client_addr_len);
-		zephyr_log("snmp_sendto: hnd = %d port = %u, IP=%s, len = %d, rc %d\n",
-			(int) handle, ntohs (port), inet_ntoa(client_addr_in->sin_addr), p->len, rc);
 
 		return rc;
 	}
@@ -296,15 +294,6 @@
 		ip_addr_copy( *result, *dst_ip );
 
 		return 1;
-	}
-
-	static void go_sleep()
-	{
-		/* Some fatal error occurred, sleep for ever. */
-		for( ; ; )
-		{
-			k_sleep( Z_TIMEOUT_MS( 5000 ) );
-		}
 	}
 
 	/* As part of the zephyr "port", we must define some
@@ -430,6 +419,10 @@ static int match_length(const char *complete, const char *partial)
 		if (!ch0 || !ch1) {
 			break;
 		}
+		if (ch1 == '*') {
+			index++;
+			break;
+		}
 		if (ch0 != ch1) {
 			break;
 		}
@@ -465,8 +458,9 @@ size_t snmp_private_call_handler(const char *prefix, void *value_p)
 
 	while (entry != NULL) {
 		if (entry->handler) {
-			int mlength = match_length(entry->prefix, prefix);
-			zephyr_log("Match \"%s\" %d/%d\n", entry->prefix, mlength, plength);
+			int mlength = match_length(prefix, entry->prefix);
+			char special = entry->prefix[mlength-1];
+			zephyr_log("Match \"%s\" %d/%d special = %c\n", entry->prefix, mlength, plength, special);
 			if (mlength >= plength || mlength == strlen (entry->prefix)) {
 				int value = entry->handler(prefix, entry);
 				value_length = sizeof value;
@@ -476,6 +470,6 @@ size_t snmp_private_call_handler(const char *prefix, void *value_p)
 		}
 		entry = entry->next;
 	}
-	zephyr_log ("snmp_private_call_handler (%s): %sfound\n", prefix, entry ? "" : "not ");
+	zephyr_log ("snmp_private_call_handler (%s): %sfound\n", prefix, value_length ? "" : "not ");
 	return value_length;
 }
