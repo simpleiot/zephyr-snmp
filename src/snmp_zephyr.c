@@ -255,6 +255,17 @@
 			socket_set.timeout.tv_sec = 0;
 			socket_set.timeout.tv_usec = 1000U;
 			has_sockets = (socket_set.socket_161 >= 0) && (socket_set.socket_162 >= 0);
+			if (has_sockets == 0) {
+				/* We're not going to run with just 1 socket. */
+				if (socket_set.socket_161 >= 0) {
+					zsock_close(socket_set.socket_161);
+					socket_set.socket_161 = -1;
+				}
+				if (socket_set.socket_162 >= 0) {
+					zsock_close(socket_set.socket_162);
+					socket_set.socket_162 = -1;
+				}
+			}
 		}
 		first_handler = NULL;
 		return has_sockets;
