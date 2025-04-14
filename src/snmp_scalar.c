@@ -39,10 +39,13 @@
 
 #if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
 
+#include "lwip/apps/snmp.h"
 #include "lwip/apps/snmp_scalar.h"
 #include "lwip/apps/snmp_core.h"
 
-static s16_t snmp_scalar_array_get_value(struct snmp_node_instance *instance, void *value);
+/* Callback mechanism: pass the snmp_varbind to check the OID and
+ * to store the value found. */
+static s16_t snmp_scalar_array_get_value(struct snmp_node_instance *instance, struct snmp_varbind *vb);
 static snmp_err_t  snmp_scalar_array_set_test(struct snmp_node_instance *instance, u16_t value_len, void *value);
 static snmp_err_t  snmp_scalar_array_set_value(struct snmp_node_instance *instance, u16_t value_len, void *value);
 
@@ -191,14 +194,19 @@ snmp_scalar_array_get_next_instance(const u32_t *root_oid, u8_t root_oid_len, st
 }
 
 static s16_t
-snmp_scalar_array_get_value(struct snmp_node_instance *instance, void *value)
+snmp_scalar_array_get_value(struct snmp_node_instance *instance, struct snmp_varbind *vb)
 {
+  const char *ptr;
   s16_t result = -1;
   const struct snmp_scalar_array_node *array_node = (const struct snmp_scalar_array_node *)(const void *)instance->node;
   const struct snmp_scalar_array_node_def *array_node_def = (const struct snmp_scalar_array_node_def *)instance->reference.const_ptr;
 
-  if (array_node->get_value != NULL) {
-    result = array_node->get_value(array_node_def, value);
+  /* _HT_ TODO make a version of print_oid() which is "reentrant". */
+  ptr = print_oid(vb->oid.len, vb->oid.id);
+  result = snmp_private_call_handler(ptr, vb->object_value);
+    /* The value "result" holds the length of the value, normally 4. */
+  if ((result == 0) && (array_node->get_value != NULL)) {
+    result = array_node->get_value(array_node_def, vb->object_value);
   }
   return result;
 }

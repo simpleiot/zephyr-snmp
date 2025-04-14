@@ -287,7 +287,7 @@ snmp_prepare_necessary_msg_fields(struct snmp_msg_trap *trap_msg, const struct s
     MIB2_COPY_SYSUPTIME_TO(&trap_msg->ts);
   } else if (trap_msg->snmp_version == SNMP_VERSION_2c) {
     /* Copy sysUpTime into the first varbind */
-    MIB2_COPY_SYSUPTIME_TO((u32_t *)varbinds[0].value);
+    MIB2_COPY_SYSUPTIME_TO((u32_t *)varbinds[0].object_value);
   }
 }
 
@@ -303,12 +303,12 @@ snmp_prepare_necessary_msg_fields(struct snmp_msg_trap *trap_msg, const struct s
 static err_t
 snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16_t tot_len, ip_addr_t *dip)
 {
+  int rc;
   err_t err = ERR_OK;
   struct pbuf *p = NULL;
   /* allocate pbuf(s) */
   p = pbuf_alloc(PBUF_TRANSPORT, tot_len, PBUF_RAM);
   if (p != NULL) {
-    int rc;
     struct snmp_pbuf_stream pbuf_stream;
     snmp_pbuf_stream_init(&pbuf_stream, p, 0, tot_len);
 
@@ -399,7 +399,7 @@ snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap *trap_msg,
   snmp_v2_special_varbinds[0].next = &snmp_v2_special_varbinds[1];
   snmp_v2_special_varbinds[1].prev = &snmp_v2_special_varbinds[0];
 
-  snmp_v2_special_varbinds[0].value = &timestamp;
+  snmp_v2_special_varbinds[0].object_value = &timestamp;
 
   snmp_v2_special_varbinds[1].next = varbinds;
 
@@ -409,7 +409,7 @@ snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap *trap_msg,
     err = snmp_prepare_trap_oid(&snmp_trap_oid, eoid, generic_trap, specific_trap);
     if (err == ERR_OK) {
       snmp_v2_special_varbinds[1].value_len = snmp_trap_oid.len * sizeof(snmp_trap_oid.id[0]);
-      snmp_v2_special_varbinds[1].value = snmp_trap_oid.id;
+      snmp_v2_special_varbinds[1].object_value = snmp_trap_oid.id;
       if (varbinds != NULL) {
         original_prev = varbinds->prev;
         varbinds->prev = &snmp_v2_special_varbinds[1];
