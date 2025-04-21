@@ -186,8 +186,8 @@ typedef enum {
 
 struct snmp_node_instance;
 struct snmp_varbind;
-/* Code related to the SNMP call-back mechanism. */
-typedef s16_t (*node_instance_get_value_method)(struct snmp_node_instance*, struct snmp_varbind*);
+
+typedef s16_t (*node_instance_get_value_method)(struct snmp_node_instance*, void*);
 typedef snmp_err_t (*node_instance_set_test_method)(struct snmp_node_instance*, u16_t, void*);
 typedef snmp_err_t (*node_instance_set_value_method)(struct snmp_node_instance*, u16_t, void*);
 typedef void (*node_instance_release_method)(struct snmp_node_instance*);

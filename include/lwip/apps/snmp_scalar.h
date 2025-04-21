@@ -84,7 +84,7 @@ struct snmp_scalar_array_node_def
  * If a matching handler is found, it will be called. The value will be set
  * in vb->object_value, and the number of bytes written is returned (16 or 32).
  */
-typedef s16_t (*snmp_scalar_array_get_value_method)(const struct snmp_scalar_array_node_def*, struct snmp_varbind *);
+typedef s16_t (*snmp_scalar_array_get_value_method)(const struct snmp_scalar_array_node_def*, void *);
 typedef snmp_err_t (*snmp_scalar_array_set_test_method)(const struct snmp_scalar_array_node_def*, u16_t, void*);
 typedef snmp_err_t (*snmp_scalar_array_set_value_method)(const struct snmp_scalar_array_node_def*, u16_t, void*);
 

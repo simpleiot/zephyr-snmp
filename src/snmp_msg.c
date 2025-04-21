@@ -46,6 +46,7 @@
 #include "lwip/ip_addr.h"
 #include "lwip/stats.h"
 #include "lwip/snmp.h"
+#include "lwip/apps/snmp_callback.h"
 
 #if LWIP_SNMP_V3
 #include "lwip/apps/snmpv3.h"
@@ -518,9 +519,16 @@ snmp_process_varbind(struct snmp_request *request, struct snmp_varbind *vb, u8_t
       request->error_status = SNMP_ERR_GENERROR;
     }
   } else {
-	/* Change because of SNMP call-backs: pass the varbind, not only the result. */
-    s16_t len = node_instance.get_value(&node_instance, vb);
-
+	s16_t len = 0;
+	{
+		const char *ptr;
+		ptr = print_oid(vb->oid.len, vb->oid.id);
+		len = snmp_private_call_handler(ptr, vb->object_value);
+		/* When the OID is not found, call the earlier get_value() method. */
+		if ((len == 0) && (node_instance.get_value != NULL)) {
+		  len = node_instance.get_value(&node_instance, vb->object_value);
+		}
+	}
     if (len >= 0) {
       vb->value_len = (u16_t)len; /* cast is OK because we checked >= 0 above */
       vb->type = node_instance.asn1_type;

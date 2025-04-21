@@ -179,6 +179,8 @@
  * @ingroup snmp
  */
 
+#include <stdio.h>
+
 #include "lwip/def.h"
 #include "lwip/apps/snmp_opts.h"
 

@@ -308,8 +308,8 @@ struct pbuf * pbuf_alloc( pbuf_layer layer,
 			   mem_size_t alloc_len = ( mem_size_t ) ( LWIP_MEM_ALIGN_SIZE( SIZEOF_STRUCT_PBUF ) + payload_len );
 
 			   /* bug #50040: Check for integer overflow when calculating alloc_len */
-			   if( ( payload_len < LWIP_MEM_ALIGN_SIZE( length ) ) ||
-				   ( alloc_len < LWIP_MEM_ALIGN_SIZE( length ) ) )
+			   if( ( payload_len < ( ( mem_size_t ) LWIP_MEM_ALIGN_SIZE( length ) ) ) ||
+				   ( alloc_len < ( ( mem_size_t ) LWIP_MEM_ALIGN_SIZE( length ) ) ) )
 			   {
 				   return NULL;
 			   }
@@ -1148,15 +1148,15 @@ err_t pbuf_copy_partial_pbuf( struct pbuf * p_to,
 			len = p_to->len - offset_to;
 		}
 
-		len = LWIP_MIN( copy_len, len );
+		len = LWIP_MIN( ((size_t)copy_len), ((size_t)len));
 		MEMCPY( ( u8_t * ) p_to->payload + offset_to, ( u8_t * ) p_from->payload + offset_from, len );
 		offset_to += len;
 		offset_from += len;
 		copy_len = ( u16_t ) ( copy_len - len );
-		LWIP_ASSERT( "offset_to <= p_to->len", offset_to <= p_to->len );
-		LWIP_ASSERT( "offset_from <= p_from->len", offset_from <= p_from->len );
+		LWIP_ASSERT( "offset_to <= p_to->len", ((size_t)offset_to) <= ((size_t)p_to->len));
+		LWIP_ASSERT( "offset_from <= p_from->len", ((size_t)offset_from) <= ((size_t)p_from->len));
 
-		if( offset_from >= p_from->len )
+		if(((size_t)offset_from) >= ((size_t)p_from->len))
 		{
 			/* on to next p_from (if any) */
 			offset_from = 0;
@@ -1166,7 +1166,7 @@ err_t pbuf_copy_partial_pbuf( struct pbuf * p_to,
 						);
 		}
 
-		if( offset_to == p_to->len )
+		if( ((size_t)offset_to) == ((size_t)p_to->len))
 		{
 			/* on to next p_to (if any) */
 			offset_to = 0;
@@ -1287,7 +1287,7 @@ void * pbuf_get_contiguous( const struct pbuf * p,
 	LWIP_ERROR( "pbuf_get_contiguous: invalid buf", ( p != NULL ), return NULL;
 
 				);
-	LWIP_ERROR( "pbuf_get_contiguous: invalid bufsize", ( buffer == NULL ) || ( bufsize >= len ), return NULL;
+	LWIP_ERROR( "pbuf_get_contiguous: invalid bufsize", ( buffer == NULL ) || ( ((size_t)bufsize) >= ((size_t)len) ), return NULL;
 
 				);
 
@@ -1463,7 +1463,7 @@ err_t pbuf_take( struct pbuf * buf,
 		LWIP_ASSERT( "pbuf_take: invalid pbuf", p != NULL );
 		buf_copy_len = total_copy_len;
 
-		if( buf_copy_len > p->len )
+		if( ((size_t)buf_copy_len) > ((size_t)p->len))
 		{
 			/* this pbuf cannot hold all remaining data */
 			buf_copy_len = p->len;
@@ -1475,7 +1475,7 @@ err_t pbuf_take( struct pbuf * buf,
 		copied_total += buf_copy_len;
 	}
 
-	LWIP_ASSERT( "did not copy all data", total_copy_len == 0 && copied_total == len );
+	LWIP_ASSERT( "did not copy all data", total_copy_len == 0 && ((size_t)copied_total) == ((size_t)len));
 	return ERR_OK;
 }
 
