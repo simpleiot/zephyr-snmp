@@ -5,6 +5,7 @@ zephyr_library_sources(
   src/pbuf.c
   src/snmp_asn1.c
   src/snmp_asn1.h
+  src/snmp_callback.c
   src/snmp_core.c
   src/snmp_core_priv.h
   src/snmp_mib2.c
@@ -32,5 +33,7 @@ zephyr_library_sources(
   src/snmpv3_mbedtls.c
   src/snmpv3_priv.h
 )
+
+target_compile_options(app PRIVATE -Wall -Wextra -Wpointer-arith)
 
 endif (CONFIG_LIB_SNMP)

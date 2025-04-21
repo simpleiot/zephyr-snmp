@@ -42,6 +42,7 @@
 
 #if LWIP_SNMP
 
+#include <lwip/arch.h>
 #include "lwip/err.h"
 #include "lwip/apps/snmp_core.h"
 #include "snmp_pbuf_stream.h"

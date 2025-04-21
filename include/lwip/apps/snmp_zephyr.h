@@ -55,7 +55,7 @@ extern int snmp_init(void);
  * @brief handle incomming requests.
  *        A call-back will be executed when necessary.
  */
-extern void snmp_loop(void);
+extern void snmp_recv_packet(int packet_id);
 
 /**
  * @brief Sets the IP-address for the next trap.
@@ -75,8 +75,13 @@ void snmp_install_handlers(void);
  */
 const char *print_oid(size_t oid_len, const u32_t *oid_words);
 
-size_t zephyr_log( const char * format, ... );
+size_t zephyr_log( const char * format, ... )
+#ifdef _GNUC_
+	__attribute__ ((format (printf, 1, 2)))
+#endif
+;
 
+void snmp_recv_complete(int packet_id);
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

@@ -110,7 +110,7 @@ interfaces_Table_get_cell_instance(const u32_t *column, const u32_t *row_oid, u8
 
   /* find netif with index */
   NETIF_FOREACH(netif) {
-    if (netif_to_num(netif) == ifIndex) {
+    if (netif_to_num(netif) == (u8_t)ifIndex) {
       /* store netif pointer for subsequent operations (get/test/set) */
       cell_instance->reference.ptr = netif;
       return SNMP_ERR_NOERROR;

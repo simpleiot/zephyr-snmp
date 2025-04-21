@@ -47,6 +47,7 @@
 #include <fcntl.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/net_if.h>
+#include <zephyr/net/socket_service.h>
 #include <app_version.h>
 
 #include "lwip/apps/snmp_opts.h"
@@ -67,9 +68,21 @@
 	{
 		int socket_161;  /* SNMP/serv socket */
 		int socket_162;  /* SNMP/trap socket */
-		struct timeval timeout; /* Maximum time to wait for an event. */
-		int select_max;  /* The max parameter for select. */
 	} socket_set_t;
+
+	/* The collection of sockets in use. */
+	static socket_set_t socket_set;
+
+	#define MAX_BUF_LEN 96 // When we have enough RAM, increase to 484
+
+	typedef struct {
+		char buf[MAX_BUF_LEN];
+		ssize_t len;
+		int fd;
+		struct sockaddr addr;
+	} SRecvPacket;
+
+	static SRecvPacket recvPackets[2];
 
 	const ip_addr_t ip_addr_any;
 
@@ -77,7 +90,7 @@
 /** Yes, a global variable. */
 	struct udp_pcb * udp_pcbs;
 
-/** The first entry in a liinked list of handler entries. */
+/** The first entry in a linked list of handler entries. */
 	static struct snmp_handler_entry * first_handler;
 
 /** Global variable containing lwIP internal statistics. Add this to your debugger's watchlist. */
@@ -89,13 +102,8 @@
 /** The default network interface. */
 	struct netif * netif_default;
 
-	static socket_set_t socket_set;
-
 /** 'has_sockets' is true when all UD sockets are created. */
 	static bool has_sockets = 0;
-
-	#define CHAR_BUF_LEN  512 /* declared on the heap at first time use. */
-	char char_buffer[CHAR_BUF_LEN];
 
 	static int create_socket(unsigned port)
 	{
@@ -141,7 +149,7 @@
 
 			struct timeval tv;
 			tv.tv_sec = 0;
-			tv.tv_usec = 10000;
+			tv.tv_usec = 1000;
 			int rc = zsock_setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 			zephyr_log( "process_udp: setsockopt %d\n", rc);
 
@@ -170,70 +178,106 @@
 	}
 
 	/**
-	 * @brief Check all open sockets and answer get request, get next, etc.
-	 *         The call will block for 10 ms, see socket_set.timeout.
+	 * @brief handle_snmp_packet() : an internal function that copies a
+	 *        UDP payload to a pbuf, in order to be analysed by the
+	 *        SNMP library. */
+	static void handle_snmp_packet(int packet_id)
+	{
+		SRecvPacket * recv = &recvPackets[packet_id];
+		struct pbuf * pbuf = pbuf_alloc( PBUF_TRANSPORT, recv->len, PBUF_RAM );
+		if( pbuf != NULL )
+		{
+			struct sockaddr_in * sin = (struct sockaddr_in *) &recv->addr;
+			pbuf->next = NULL;
+			memcpy (pbuf->payload, recv->buf, recv->len);
+			pbuf->tot_len = recv->len;
+			pbuf->len = recv->len;
+			pbuf->ref = 1;
+
+			ip_addr_t from_address;
+			from_address.addr = sin->sin_addr.s_addr;
+			/* Here a socket is cast to a void pointer because lwIP needs it a void*.
+			 * If the library wants to send a reply, snmp_sendto() will be called. */
+			snmp_receive( (void*) recv->fd, pbuf, &from_address, sin->sin_port);
+			pbuf_free (pbuf);
+		}
+	}
+
+	/**
+	 * @brief snmp_recv_packet(): The SNMP server thread will call this
+	 *        function after snmp_recv_complete(packet_id) was called.
+	 *        'packet_id' identifies the packet number.
 	 */
 
-	void snmp_loop()
+	void snmp_recv_packet(int packet_id)
 	{
-		int rc_poll;
-
 		if (!has_sockets) {
+			/* Sockets are not (yet) created, so we shouldn't get here. */
 			k_sleep(K_MSEC(200));
 			return;
 		}
-		struct pollfd fds[2];
-		
-		// Configure pollfd for UDP socket 161
-		fds[0].fd = socket_set.socket_161;
-		fds[0].events = POLLIN;
-		
-		// Configure pollfd for UDP socket 162
-		fds[1].fd = socket_set.socket_162;
-		fds[1].events = POLLIN;
-
-		rc_poll = poll(fds, 2, 200); // Wait 200 ms
-
-		if (rc_poll > 0) for (int index = 0; index < 2; index++)
-		{
-			int udp_socket = (index == 0) ? socket_set.socket_161 : socket_set.socket_162;
-			struct sockaddr client_addr;
-			struct sockaddr_in * sin = (struct sockaddr_in *) &client_addr;
-			socklen_t client_addr_len = sizeof client_addr;
-			int len;
-			len = zsock_recvfrom( udp_socket,
-								  char_buffer,
-								  sizeof char_buffer,
-								  0, // flags
-								  &client_addr,
-								  &client_addr_len );
-			if (len > 0 && index < 2) {
-				int port = (index == 0) ? 161 : 162;
+		/* A sanity check on 'packet_id' */
+		if ((packet_id >= 0) && (packet_id < (int)ARRAY_SIZE(recvPackets))) {
+			SRecvPacket * recv = &recvPackets[packet_id];
+			ssize_t len = recv->len;
+			if (len > 0) {
+				struct sockaddr client_addr;
+				struct sockaddr_in * sin = (struct sockaddr_in *) &client_addr;
+				memcpy (&client_addr, &recv->addr, sizeof client_addr);
+			
+				int port = (recv->fd == socket_set.socket_161) ? 161 : 162;
 				zephyr_log( "recv[%u]: %d bytes from %s:%u\n",
-					 port,
-					 len,
-					 inet_ntoa(sin->sin_addr),
-					 ntohs(sin->sin_port));
+				 	port, len, inet_ntoa(sin->sin_addr), ntohs(sin->sin_port));
+
+				handle_snmp_packet(packet_id);
+
+				recvPackets[packet_id].len = 0;
+			} /* if (recvPackets[0].len > 0) */
+		} else {
+			zephyr_log("snmp_recv_packet: invalid packet_id = %d\n", packet_id);
+		}
+	}
+
+/**
+ * @brief Create sockets, starts SNMP Agent.
+ */
+#define MAX_SERVICES 2
+static void udp_service_handler(struct net_socket_service_event *pev);
+NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERVICES);
+
+	/* @brief udp_service_handler() is a callback function for the 
+	 * Zephyr socket service. It will be called from a special thread.
+	 */
+	static void udp_service_handler(struct net_socket_service_event *pev)
+	{
+		static int packet_id = 0;
+		SRecvPacket * recv = &recvPackets[packet_id];
+		struct pollfd *pfd = &pev->event;
+		socklen_t addrlen = sizeof(recv->addr);
+		ssize_t len;
+		/* It looks like we *have to* read the received data.
+		 * We'll pass it on to the application. */
+		len = zsock_recvfrom(pfd->fd,
+							 recv->buf,
+							 sizeof(recv->buf),
+							 0, // ZSOCK_MSG_DONTWAIT,
+							 (struct sockaddr *)&recv->addr,
+							 &addrlen);
+		if (len > 0) {
+			recv->len = len;
+			recv->fd = pfd->fd;
+		/* A UDP packet has been received, pass it to the SNMP thread,
+		 * which will call 'snmp_recv_packet(packet_id)'. */
+			snmp_recv_complete(packet_id);
+//			zephyr_log ("udp_service_handler: idx %d size %d\n", packet_id, len);
+			/* Just in case, put a new buffer available. */
+			if (++packet_id >= (int)ARRAY_SIZE(recvPackets)) {
+				packet_id = 0;
 			}
-			if (len > 0)
-			{
-				struct pbuf * pbuf = pbuf_alloc( PBUF_TRANSPORT, len, PBUF_RAM );
-
-				if( pbuf != NULL )
-				{
-					pbuf->next = NULL;
-					memcpy( pbuf->payload, char_buffer, len );
-					pbuf->tot_len = len;
-					pbuf->len = len;
-					pbuf->ref = 1;
-
-					ip_addr_t from_address;
-					from_address.addr = sin->sin_addr.s_addr;
-					snmp_receive( (void*) udp_socket, pbuf, &from_address, sin->sin_port);
-					pbuf_free (pbuf);
-				}
-			} /* if (len > 0 && index == 0) */
-		} /* for (int index = 0 */
+			recvPackets[packet_id].len = 0;
+		} else {
+//			zephyr_log ("udp_service_handler: recvfrom() returns rc = %d\n", len);
+		}
 	}
 
 /**
@@ -252,9 +296,9 @@
 			/* The lwIP SNMP driver owns a socket for traps 'snmp_traps_handle'. */
 			snmp_traps_handle = ( void * ) socket_set.socket_162;
 
-			socket_set.timeout.tv_sec = 0;
-			socket_set.timeout.tv_usec = 1000U;
-			has_sockets = (socket_set.socket_161 >= 0) && (socket_set.socket_162 >= 0);
+			has_sockets =
+				(socket_set.socket_161 >= 0) &&
+				(socket_set.socket_162 >= 0);
 			if (has_sockets == 0) {
 				/* We're not going to run with just 1 socket. */
 				if (socket_set.socket_161 >= 0) {
@@ -264,6 +308,22 @@
 				if (socket_set.socket_162 >= 0) {
 					zsock_close(socket_set.socket_162);
 					socket_set.socket_162 = -1;
+				}
+			} else {
+				static struct pollfd fds[2];
+				
+				// Configure pollfd for UDP socket 161
+				fds[0].fd = socket_set.socket_161;
+				fds[0].events = POLLIN;
+				
+				// Configure pollfd for UDP socket 162
+				fds[1].fd = socket_set.socket_162;
+				fds[1].events = POLLIN;
+
+				int ret = net_socket_service_register(&service_udp, fds, ARRAY_SIZE(fds), NULL);
+				zephyr_log("net_socket_service_register: rc %d\n", ret);
+				if (ret < 0) {
+					// handle error
 				}
 			}
 		}
@@ -299,6 +359,7 @@
 	{
 		const ip_addr_t * dst_ip = dst;
 		struct in_addr in_addr;
+		(void)handle;
 
 		in_addr.s_addr = dst->addr;
 //      zephyr_log ("snmp_get_local_ip_for_dst: dst->addr = %s\n", inet_ntoa(in_addr));
@@ -329,6 +390,7 @@
 
 	void * memp_malloc( memp_t type )
 	{
+		(void)type;
 		__ASSERT( false, "memp_malloc() should not be called" );
 		return NULL;
 	}
@@ -407,80 +469,4 @@ const char *leafNodeName (unsigned aType)
 	case SNMP_NODE_THREADSYNC:   return "Threadsync";   // 0x04
 	}
 	return "Unknown";
-}
-
-/*
- *       ####          ###   ###   ##                     ##
- *      #    #           #     #    #                      #
- *     #     #           #     #    #                      #
- *     #        ####     #     #    #####   ####    ####   #    #
- *     #            #    #     #    #    #      #  #   ##  #   #
- *     #        #####    #     #    #    #  #####  #       ####
- *     #     # #    #    #     #    #    # #    #  #       #   #
- *      #    # #    #    #     #    #    # #    #  #   ##  #    #
- *       ####   ### ## ##### ##### ## ###   ### ##  ####  ##   ##
- */
-
-static int match_length(const char *complete, const char *partial)
-{
-	int index;
-	for (index = 0; ; index++) {
-		char ch0 = complete[index];
-		char ch1 = partial[index];
-		if (!ch0 || !ch1) {
-			break;
-		}
-		if (ch1 == '*') {
-			index++;
-			break;
-		}
-		if (ch0 != ch1) {
-			break;
-		}
-	}
-	return index;
-}
-
-void install_snmp_handler(struct snmp_handler_entry * new_entry)
-{
-	new_entry->next = NULL;
-	if (first_handler == NULL) {
-		first_handler = new_entry;
-	} else {
-		struct snmp_handler_entry * current = first_handler;
-		for (;;) {
-			/* assert that 'current != NULL ' */
-			if (current->next == NULL) {
-				current->next = new_entry;
-				break;
-			}
-			current = current->next;
-		}
-	}
-}
-
-size_t snmp_private_call_handler(const char *prefix, void *value_p)
-{
-	int value_length = 0;
-	struct snmp_handler_entry *entry = first_handler;
-	size_t plength = strlen (prefix);
-	/* 'value_p' points to an array of SNMP_VALUE_BUFFER_SIZE bytes. */
-	zephyr_log("snmp_private_call_handler: Looking for %s\n", prefix);
-
-	while (entry != NULL) {
-		if (entry->handler) {
-			int mlength = match_length(prefix, entry->prefix);
-			char special = entry->prefix[mlength-1];
-			zephyr_log("Match \"%s\" %d/%d special = %c\n", entry->prefix, mlength, plength, special);
-			if (mlength >= plength || mlength == strlen (entry->prefix)) {
-				int value = entry->handler(prefix, entry);
-				value_length = sizeof value;
-				memcpy (value_p, &value, value_length);
-				break;
-			}
-		}
-		entry = entry->next;
-	}
-	zephyr_log ("snmp_private_call_handler (%s): %sfound\n", prefix, value_length ? "" : "not ");
-	return value_length;
 }
