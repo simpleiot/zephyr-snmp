@@ -34,6 +34,4 @@ zephyr_library_sources(
   src/snmpv3_priv.h
 )
 
-target_compile_options(app PRIVATE -Wall -Wextra -Wpointer-arith)
-
 endif (CONFIG_LIB_SNMP)
