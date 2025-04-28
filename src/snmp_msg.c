@@ -527,6 +527,10 @@ snmp_process_varbind(struct snmp_request *request, struct snmp_varbind *vb, u8_t
 		/* When the OID is not found, call the earlier get_value() method. */
 		if ((len == 0) && (node_instance.get_value != NULL)) {
 		  len = node_instance.get_value(&node_instance, vb->object_value);
+		  if (len <= 0) {
+		  	/* Log this event, just for debugging. */
+			  zephyr_log("snmp_process_varbind: no value found for %s\n", ptr);
+		  }
 		}
 	}
     if (len >= 0) {
