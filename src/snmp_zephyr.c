@@ -50,8 +50,8 @@
 #include <zephyr/net/socket_service.h>
 #include <app_version.h>
 
-#include "lwip/apps/snmp_opts.h"
-#include "lwip/apps/snmp_zephyr.h"
+#include <lwip/apps/snmp_opts.h>
+#include <lwip/apps/snmp_zephyr.h>
 
 #if LWIP_SNMP && SNMP_USE_ZEPHYR
 

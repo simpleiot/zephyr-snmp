@@ -59,20 +59,21 @@ size_t snmp_private_call_handler(const char *prefix, void *value_p)
             
 	/* value is actually an array of SNMP_VALUE_BUFFER_SIZE bytes. */
 	zephyr_log("snmp_private_call_handler: Looking for %s\n", prefix);
-		while (entry != NULL) {
-			if (entry->handler) {
+	while (entry != NULL) {
+		if (entry->handler) {
 			size_t mlength = match_length(prefix, entry->prefix);
 			char special = entry->prefix[mlength-1];
-			zephyr_log("Match \"%s\" %d/%d special = %c\n", entry->prefix, mlength, plength, special);
-			if ((mlength >= plength) || (mlength == strlen (entry->prefix))) {
-					int value = entry->handler(prefix, entry);
-					value_length = sizeof value;
-					memcpy (value_p, &value, value_length);
-					break;
-				}
+			bool does_match = (mlength >= plength) || (mlength == strlen (entry->prefix));
+			zephyr_log("Match %s \"%s\" %d/%d special = %c\n", does_match ? "true" : "false", entry->prefix, mlength, plength, special);
+			if (does_match) {
+				int value = entry->handler(prefix, entry);
+				value_length = sizeof value;
+				memcpy (value_p, &value, value_length);
+				break;
 			}
-			entry = entry->next;
 		}
+		entry = entry->next;
+	}
 	zephyr_log ("snmp_private_call_handler (%s): %sfound\n", prefix, value_length ? "" : "not ");
 	return value_length;
 }

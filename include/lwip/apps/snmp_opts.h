@@ -180,9 +180,9 @@
  * The OID identifiying the device. This may be the enterprise OID itself or any OID located below it in tree.
  */
 #if !defined SNMP_DEVICE_ENTERPRISE_OID || defined __DOXYGEN__
-#define SNMP_LWIP_ENTERPRISE_OID 26381
+#define SNMP_LWIP_ENTERPRISE_OID 62530
 /**
- * IANA assigned enterprise ID for lwIP is 26381
+ * IANA assigned enterprise ID for lwIP is 62530
  * @see http://www.iana.org/assignments/enterprise-numbers
  *
  * @note this enterprise ID is assigned to the lwIP project,
@@ -226,7 +226,7 @@
  * Value return for sysDesc field of MIB2.
  */
 #if !defined SNMP_LWIP_MIB2_SYSDESC || defined __DOXYGEN__
-#define SNMP_LWIP_MIB2_SYSDESC              "lwIP"
+#define SNMP_LWIP_MIB2_SYSDESC              "sysDesc"
 #endif
 
 /**
@@ -234,7 +234,7 @@
  * To make sysName field settable, call snmp_mib2_set_sysname() to provide the necessary buffers.
  */
 #if !defined SNMP_LWIP_MIB2_SYSNAME || defined __DOXYGEN__
-#define SNMP_LWIP_MIB2_SYSNAME              "FQDN-unk"
+#define SNMP_LWIP_MIB2_SYSNAME              "sysName"
 #endif
 
 /**
@@ -242,7 +242,7 @@
  * To make sysContact field settable, call snmp_mib2_set_syscontact() to provide the necessary buffers.
  */
 #if !defined SNMP_LWIP_MIB2_SYSCONTACT || defined __DOXYGEN__
-#define SNMP_LWIP_MIB2_SYSCONTACT           ""
+#define SNMP_LWIP_MIB2_SYSCONTACT           "sysContact"
 #endif
 
 /**
@@ -250,7 +250,7 @@
  * To make sysLocation field settable, call snmp_mib2_set_syslocation() to provide the necessary buffers.
  */
 #if !defined SNMP_LWIP_MIB2_SYSLOCATION || defined __DOXYGEN__
-#define SNMP_LWIP_MIB2_SYSLOCATION          ""
+#define SNMP_LWIP_MIB2_SYSLOCATION          "sysLocation"
 #endif
 
 /**
