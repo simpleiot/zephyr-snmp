@@ -8,6 +8,10 @@ and this project adheres to
 
 ## [unreleased]
 
+## [v0.0.4] - 2025-04-30
+
+- mib2 entries
+
 ## [v0.0.3] - 2025-04-23
 
 - remove app compiler flags as this was leaking into the main application compile
@@ -66,5 +70,3 @@ and this project adheres to
 - Added the necessary header files from the latest lwIP release, also started to port the software for Zypher, using it native IP-stack.
 - Adapted opt.h to make things compiling and running.
 - TODO: porting code should appear in lwipopts.h
-
-
