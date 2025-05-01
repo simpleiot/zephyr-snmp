@@ -90,9 +90,6 @@
 /** Yes, a global variable. */
 	struct udp_pcb * udp_pcbs;
 
-/** The first entry in a linked list of handler entries. */
-	static struct snmp_handler_entry * first_handler;
-
 /** Global variable containing lwIP internal statistics. Add this to your debugger's watchlist. */
 	struct stats_ lwip_stats;
 
@@ -327,7 +324,6 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 				}
 			}
 		}
-		first_handler = NULL;
 		return has_sockets;
 	}
 
