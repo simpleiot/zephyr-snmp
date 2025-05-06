@@ -55,7 +55,6 @@
 
 #if LWIP_SNMP && SNMP_USE_ZEPHYR
 
-	#include <string.h>
 	#include "lwip/ip.h"
 	#include "lwip/udp.h"
 	#include "snmp_msg.h"
@@ -101,6 +100,10 @@
 
 /** 'has_sockets' is true when all UD sockets are created. */
 	static bool has_sockets = 0;
+
+/** The address of a user function, which will be called when a UDP packet
+ * is received. */
+	static recv_packet_handler user_recv_packet_handler;
 
 	static int create_socket(unsigned port)
 	{
@@ -202,7 +205,7 @@
 
 	/**
 	 * @brief snmp_recv_packet(): The SNMP server thread will call this
-	 *        function after snmp_recv_complete(packet_id) was called.
+	 *        function after it "received packet handler" was called.
 	 *        'packet_id' identifies the packet number.
 	 */
 
@@ -263,10 +266,11 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 		if (len > 0) {
 			recv->len = len;
 			recv->fd = pfd->fd;
-		/* A UDP packet has been received, pass it to the SNMP thread,
+		/* A UDP packet has been received, pass it to the user's SNMP thread,
 		 * which will call 'snmp_recv_packet(packet_id)'. */
-			snmp_recv_complete(packet_id);
-//			zephyr_log ("udp_service_handler: idx %d size %d\n", packet_id, len);
+			if (user_recv_packet_handler != NULL) {
+				user_recv_packet_handler(packet_id);
+			}
 			/* Just in case, put a new buffer available. */
 			if (++packet_id >= (int)ARRAY_SIZE(recvPackets)) {
 				packet_id = 0;
@@ -280,9 +284,11 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 /**
  * @brief Create sockets, starts SNMP Agent.
  */
-	int snmp_init(void)
+	int snmp_zephyr_init(recv_packet_handler user_function)
 	{
 		static int has_created = false;
+
+		user_recv_packet_handler = user_function;
 		if (has_created == false) {
 			has_created = true;
 
