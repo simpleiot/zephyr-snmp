@@ -11,10 +11,18 @@ extern "C" {
 
 
 /**
+ * @brief handle incomming requests.
+ *        A call-back will be executed when necessary.
+ */
+typedef void ( * recv_packet_handler )(int packet_id);
+
+/**
  * @brief Starts SNMP Agent. It assumes that the network is up and
  *        running. The UDP sockets will be created.
+ *
+ * @param[in] The address of a function that forwards incoming packets.
  */
-extern int snmp_init(void);
+extern int snmp_zephyr_init(recv_packet_handler handler);
 
 /**
  * @brief handle incomming requests.
@@ -45,10 +53,6 @@ size_t zephyr_log( const char * format, ... )
 	__attribute__ ((format (printf, 1, 2)))
 #endif
 ;
-
-/* A user provided function that will wake-up or interrupt any blocking call
- * and call snmp_recv_packet() to receive an SNMP packet. */
-void snmp_recv_complete(int packet_id);
 
 #ifdef __cplusplus
 } /* extern "C" */
