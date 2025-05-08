@@ -8,6 +8,10 @@ and this project adheres to
 
 ## [unreleased]
 
+## [v0.0.6] - 2025-05-08
+
+- remove circular reference
+
 ## [v0.0.5] - 2025-05-01
 
 - fix compile issues
