@@ -8,6 +8,10 @@ and this project adheres to
 
 ## [unreleased]
 
+- document the module in README.md: adding it to a project, configuration, and
+  usage examples for the agent thread, MIB-2 system group, OID callbacks,
+  private MIBs, and traps
+
 ## [v0.0.6] - 2025-05-08
 
 - remove circular reference
