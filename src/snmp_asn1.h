@@ -89,7 +89,7 @@ struct snmp_asn1_tlv {
 		(tlv).type_len = 0;                                                                \
 		(tlv).length_len = (length_len_);                                                  \
 		(tlv).value_len = (value_len_);                                                    \
-	} while (0);
+	} while (0)
 
 int snmp_asn1_dec_tlv(struct snmp_pbuf_stream *pbuf_stream, struct snmp_asn1_tlv *tlv);
 int snmp_asn1_dec_u32t(struct snmp_pbuf_stream *pbuf_stream, uint16_t len, uint32_t *value);

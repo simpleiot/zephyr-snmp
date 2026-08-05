@@ -8,6 +8,17 @@ and this project adheres to
 
 ## [unreleased]
 
+- clear every checkpatch finding across the sources and make the continuous
+  integration step fail when new ones appear, rather than reporting them and
+  passing. The changes are style only: block comments, blank lines after
+  declarations, comment-only `//` removals, `sizeof` parentheses and a few
+  guard-clause rewrites that replace `else` after a `return` or `break`. A
+  full walk plus get, get-next, get-bulk, set and error-path probes return
+  byte-identical results before and after
+- keep the error-propagation macros in the ASN.1 codec, with
+  `MACRO_WITH_FLOW_CONTROL` recorded in `.checkpatch.conf` as a deliberate
+  exception rather than reworking roughly 150 call sites
+
 ## [v0.1.0] - 2026-08-05
 
 - require Zephyr 4.4 explicitly. The module builds on the namespaced

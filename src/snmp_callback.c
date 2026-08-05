@@ -22,6 +22,7 @@ static struct snmp_handler_entry *first_handler;
 static int match_length(const char *complete, const char *partial)
 {
 	int index;
+
 	for (index = 0;; index++) {
 		char ch0 = complete[index];
 		char ch1 = partial[index];
@@ -66,14 +67,15 @@ size_t snmp_private_call_handler(const char *prefix, void *value_p)
 	size_t plength = strlen(prefix);
 
 	/* value is actually an array of SNMP_VALUE_BUFFER_SIZE bytes. */
-	LOG_DBG("snmp_private_call_handler: looking for %s", prefix);
+	LOG_DBG("looking for %s", prefix);
 	while (entry != NULL) {
 		if (entry->handler) {
 			size_t mlength = match_length(prefix, entry->prefix);
 			/* The last character matched, or '\0' when nothing did.
 			 * Reading prefix[mlength - 1] without this check ran off
 			 * the front of the string whenever the first character
-			 * already differed. */
+			 * already differed.
+			 */
 			char special = (mlength > 0) ? entry->prefix[mlength - 1] : '\0';
 			bool does_match =
 				(mlength >= plength) || (mlength == strlen(entry->prefix));
@@ -83,7 +85,8 @@ size_t snmp_private_call_handler(const char *prefix, void *value_p)
 				special);
 			if (does_match) {
 				int value = entry->handler(prefix, entry);
-				value_length = sizeof value;
+
+				value_length = sizeof(value);
 				memcpy(value_p, &value, value_length);
 				break;
 			}

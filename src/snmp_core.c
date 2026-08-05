@@ -297,7 +297,8 @@ uint8_t snmp_oid_to_ip4(const uint32_t *oid, struct net_in_addr *ip)
 	}
 
 	/* InetAddressIPv4 is most significant octet first, which is also how the
-	   address is held on the wire. */
+	 * address is held on the wire.
+	 */
 	ip->s_addr = net_htonl(((uint32_t)oid[0] << 24) | ((uint32_t)oid[1] << 16) |
 			       ((uint32_t)oid[2] << 8) | (uint32_t)oid[3]);
 	return 1;
@@ -460,6 +461,7 @@ void snmp_oid_prefix(struct snmp_obj_id *target, const uint32_t *oid, uint8_t oi
 	if (oid_len > 0) {
 		/* move existing OID to make room at the beginning for OID to insert */
 		int i;
+
 		for (i = target->len - 1; i >= 0; i--) {
 			target->id[i + oid_len] = target->id[i];
 		}
@@ -513,6 +515,7 @@ int8_t snmp_oid_compare(const uint32_t *oid1, uint8_t oid1_len, const uint32_t *
 			uint8_t oid2_len)
 {
 	uint8_t level = 0;
+
 	LWIP_ASSERT("'oid1' param must not be NULL or 'oid1_len' param be 0!",
 		    (oid1 != NULL) || (oid1_len == 0));
 	LWIP_ASSERT("'oid2' param must not be NULL or 'oid2_len' param be 0!",
@@ -726,12 +729,14 @@ uint8_t snmp_get_next_node_instance_from_oid(
 	}
 
 	/* resolve target node from MIB, skip to next MIB if no suitable node is found in current
-	 * MIB */
+	 * MIB
+	 */
 	while ((mib != NULL) && (mn == NULL)) {
 		uint8_t oid_instance_len;
 
 		/* check if OID directly references a node inside current MIB, in this case we have
-		 * to ask this node for the next instance */
+		 * to ask this node for the next instance
+		 */
 		mn = snmp_mib_tree_resolve_exact(mib, start_oid, start_oid_len, &oid_instance_len);
 		if (mn != NULL) {
 			snmp_oid_assign(node_oid, start_oid,
@@ -742,13 +747,15 @@ uint8_t snmp_get_next_node_instance_from_oid(
 		} else {
 			/* OID does not reference a node, search for the next closest node inside
 			 * MIB; set instance_oid.len to zero because we want the first instance of
-			 * this node */
+			 * this node
+			 */
 			mn = snmp_mib_tree_resolve_next(mib, start_oid, start_oid_len, node_oid);
 			node_instance->instance_oid.len = 0;
 		}
 
 		/* validate the node; if the node has no further instance or the returned instance
-		 * is invalid, search for the next in MIB and validate again */
+		 * is invalid, search for the next in MIB and validate again
+		 */
 		node_instance->node = mn;
 		while (mn != NULL) {
 			uint8_t result;
@@ -784,13 +791,15 @@ uint8_t snmp_get_next_node_instance_from_oid(
 #endif
 
 				/* validate node because the node may be not accessible for example
-				 * (but let the caller decide what is valid */
+				 * (but let the caller decide what is valid
+				 */
 				if ((validate_node_instance_method == NULL) ||
 				    (validate_node_instance_method(node_instance,
 								   validate_node_instance_arg) ==
 				     SNMP_ERR_NOERROR)) {
 					/* node_oid "returns" the full result OID (including the
-					 * instance part) */
+					 * instance part)
+					 */
 					snmp_oid_append(node_oid, node_instance->instance_oid.id,
 							node_instance->instance_oid.len);
 					break;
@@ -800,23 +809,22 @@ uint8_t snmp_get_next_node_instance_from_oid(
 					node_instance->release_instance(node_instance);
 				}
 				/*
-				the instance itself is not valid, ask for next instance from same
-				node. we don't have to change any variables because
-				node_instance->instance_oid is used as input (starting point) as
-				well as output (resulting next OID), so we have to simply call
-				get_next_instance method again
-				*/
+				 * the instance itself is not valid, ask for next instance from same
+				 * node. we don't have to change any variables because
+				 * node_instance->instance_oid is used as input (starting point) as
+				 * well as output (resulting next OID), so we have to simply call
+				 * get_next_instance method again
+				 */
 			} else {
 				if (node_instance->release_instance != NULL) {
 					node_instance->release_instance(node_instance);
 				}
 
-				/* the node has no further instance, skip to next node */
-				mn = snmp_mib_tree_resolve_next(
-					mib, node_oid->id, node_oid->len,
-					&node_instance->instance_oid); /* misuse
-									  node_instance->instance_oid
-									  as tmp buffer */
+				/* The node has no further instance, skip to the next
+				 * node. instance_oid serves as the scratch buffer here.
+				 */
+				mn = snmp_mib_tree_resolve_next(mib, node_oid->id, node_oid->len,
+								&node_instance->instance_oid);
 				if (mn != NULL) {
 					/* prepare for next loop */
 					snmp_oid_assign(node_oid, node_instance->instance_oid.id,
@@ -829,14 +837,16 @@ uint8_t snmp_get_next_node_instance_from_oid(
 
 		if (mn != NULL) {
 			/*
-			we found a suitable next node,
-			now we have to check if a inner MIB is located between the searched OID and
-			the resulting OID. this is possible because MIB's may be located anywhere in
-			the global tree, that means also in the subtree of another MIB (e.g. if
-			searched OID is .2 and resulting OID is .4, then another MIB having .3 as
-			root node may exist)
-			*/
+			 * we found a suitable next node, now we have to check if
+			 * an inner MIB is located between the searched OID and the
+			 * resulting OID. this is possible because MIBs may be
+			 * located anywhere in the global tree, that means also in
+			 * the subtree of another MIB (e.g. if searched OID is .2
+			 * and resulting OID is .4, then another MIB having .3 as
+			 * root node may exist)
+			 */
 			const struct snmp_mib *intermediate_mib;
+
 			intermediate_mib = snmp_get_mib_between(start_oid, start_oid_len,
 								node_oid->id, node_oid->len);
 
@@ -854,14 +864,17 @@ uint8_t snmp_get_next_node_instance_from_oid(
 			/* else { we found out target node } */
 		} else {
 			/*
-			there is no further (suitable) node inside this MIB, search for the next MIB
-			with following priority
-			1. search for inner MIB's (whose root is located inside tree of current MIB)
-			2. search for surrounding MIB's (where the current MIB is the inner MIB) and
-			continue there if any
-			3. take the next closest MIB (not being related to the current MIB)
-			*/
+			 * there is no further (suitable) node inside this MIB,
+			 * search for the next MIB with following priority
+			 * 1. search for inner MIBs (whose root is located inside
+			 *    the tree of the current MIB)
+			 * 2. search for surrounding MIBs (where the current MIB is
+			 *    the inner MIB) and continue there if any
+			 * 3. take the next closest MIB (not being related to the
+			 *    current MIB)
+			 */
 			const struct snmp_mib *next_mib;
+
 			next_mib = snmp_get_next_mib(
 				start_oid,
 				start_oid_len); /* returns MIB's related to point 1 and 3 */
@@ -874,26 +887,25 @@ uint8_t snmp_get_next_node_instance_from_oid(
 				mib = next_mib;
 				start_oid = mib->base_oid;
 				start_oid_len = mib->base_oid_len;
-			} else {
-				/* check if there is a surrounding mib where to continue (point 2)
-				 * (only possible if OID length > 1) */
-				if (mib->base_oid_len > 1) {
-					mib = snmp_get_mib_from_oid(mib->base_oid,
-								    mib->base_oid_len - 1);
+			} else if (mib->base_oid_len > 1) {
+				/* Check for a surrounding MIB to continue from
+				 * (point 2), which is only possible when the OID is
+				 * longer than one element. When one is found, start_oid
+				 * stays as it is so the walk resumes at the current
+				 * offset inside that MIB.
+				 */
+				mib = snmp_get_mib_from_oid(mib->base_oid, mib->base_oid_len - 1);
 
-					if (mib == NULL) {
-						/* no surrounding mib, use next mib encountered
-						 * above (point 3) */
-						mib = next_mib;
+				if (mib == NULL) {
+					/* no surrounding mib, use next mib encountered
+					 * above (point 3)
+					 */
+					mib = next_mib;
 
-						if (mib != NULL) {
-							start_oid = mib->base_oid;
-							start_oid_len = mib->base_oid_len;
-						}
+					if (mib != NULL) {
+						start_oid = mib->base_oid;
+						start_oid_len = mib->base_oid_len;
 					}
-					/* else { start_oid stays the same because we want to
-					 * continue from current offset in surrounding mib (point 2)
-					 * } */
 				}
 			}
 		}
@@ -922,6 +934,7 @@ const struct snmp_node *snmp_mib_tree_resolve_exact(const struct snmp_mib *mib, 
 		uint32_t subnode_oid = *(oid + oid_offset);
 
 		uint32_t i = (*(const struct snmp_tree_node *const *)node)->subnode_count;
+
 		node = (*(const struct snmp_tree_node *const *)node)->subnodes;
 		while ((i > 0) && ((*node)->oid != subnode_oid)) {
 			node++;
@@ -956,16 +969,19 @@ const struct snmp_node *snmp_mib_tree_resolve_next(const struct snmp_mib *mib, c
 
 	if (mib->root_node->node_type != SNMP_NODE_TREE) {
 		/* a next operation on a mib with only a leaf node will always return NULL because
-		 * there is no other node */
+		 * there is no other node
+		 */
 		return NULL;
 	}
 
 	/* first build node stack related to passed oid (as far as possible), then go backwards to
-	 * determine the next node */
+	 * determine the next node
+	 */
 	node_stack[nsi] = (const struct snmp_tree_node *)(const void *)mib->root_node;
 	while (oid_offset < oid_len) {
 		/* search for matching sub node */
 		uint32_t i = node_stack[nsi]->subnode_count;
+
 		node = node_stack[nsi]->subnodes;
 
 		subnode_oid = *(oid + oid_offset);
@@ -997,6 +1013,7 @@ const struct snmp_node *snmp_mib_tree_resolve_next(const struct snmp_mib *mib, c
 
 		/* find next node on current level */
 		int32_t i = node_stack[nsi]->subnode_count;
+
 		node = node_stack[nsi]->subnodes;
 		while (i > 0) {
 			if ((*node)->oid == subnode_oid) {
@@ -1013,7 +1030,8 @@ const struct snmp_node *snmp_mib_tree_resolve_next(const struct snmp_mib *mib, c
 
 		if (subnode == NULL) {
 			/* no further node found on this level, go one level up and start searching
-			 * with index of current node*/
+			 * with index of current node
+			 */
 			subnode_oid = node_stack[nsi]->node.oid + 1;
 			nsi--;
 		} else {
@@ -1056,10 +1074,12 @@ void snmp_next_oid_init(struct snmp_next_oid_state *state, const uint32_t *start
 	state->status = SNMP_NEXT_OID_STATUS_NO_MATCH;
 }
 
-/** checks if the passed incomplete OID may be a possible candidate for snmp_next_oid_check();
-this method is intended if the complete OID is not yet known but it is very expensive to build it
-up, so it is possible to test the starting part before building up the complete oid and pass it to
-snmp_next_oid_check()*/
+/** checks if the passed incomplete OID may be a possible candidate for
+ * snmp_next_oid_check(); this method is intended if the complete OID is not yet
+ * known but it is very expensive to build it up, so it is possible to test the
+ * starting part before building up the complete oid and pass it to
+ * snmp_next_oid_check()
+ */
 uint8_t snmp_next_oid_precheck(struct snmp_next_oid_state *state, const uint32_t *oid,
 			       uint8_t oid_len)
 {
@@ -1083,7 +1103,8 @@ uint8_t snmp_next_oid_precheck(struct snmp_next_oid_state *state, const uint32_t
 }
 
 /** checks the passed OID if it is a candidate to be the next one (get_next); returns !=0 if passed
- * oid is currently closest, otherwise 0 */
+ * oid is currently closest, otherwise 0
+ */
 uint8_t snmp_next_oid_check(struct snmp_next_oid_state *state, const uint32_t *oid, uint8_t oid_len,
 			    void *reference)
 {
@@ -1096,15 +1117,16 @@ uint8_t snmp_next_oid_check(struct snmp_next_oid_state *state, const uint32_t *o
 			if ((state->status == SNMP_NEXT_OID_STATUS_NO_MATCH) ||
 			    (snmp_oid_compare(oid, oid_len, state->next_oid, state->next_oid_len) <
 			     0)) {
-				if (oid_len <= state->next_oid_max_len) {
-					MEMCPY(state->next_oid, oid, oid_len * sizeof(uint32_t));
-					state->next_oid_len = oid_len;
-					state->status = SNMP_NEXT_OID_STATUS_SUCCESS;
-					state->reference = reference;
-					return 1;
-				} else {
+				if (oid_len > state->next_oid_max_len) {
 					state->status = SNMP_NEXT_OID_STATUS_BUF_TO_SMALL;
+					return 0;
 				}
+
+				MEMCPY(state->next_oid, oid, oid_len * sizeof(uint32_t));
+				state->next_oid_len = oid_len;
+				state->status = SNMP_NEXT_OID_STATUS_SUCCESS;
+				state->reference = reference;
+				return 1;
 			}
 		}
 	}
@@ -1187,12 +1209,12 @@ int snmp_decode_bits(const uint8_t *buf, uint32_t buf_len, uint32_t *bit_value)
 int snmp_decode_truthvalue(const int32_t *asn1_value, uint8_t *bool_value)
 {
 	/* defined by RFC1443:
-	 TruthValue ::= TEXTUAL-CONVENTION
-	  STATUS       current
-	  DESCRIPTION
-	   "Represents a boolean value."
-	  SYNTAX       INTEGER { true(1), false(2) }
-	*/
+	 * TruthValue ::= TEXTUAL-CONVENTION
+	 * STATUS       current
+	 * DESCRIPTION
+	 * "Represents a boolean value."
+	 * SYNTAX       INTEGER { true(1), false(2) }
+	 */
 
 	if ((asn1_value == NULL) || (bool_value == NULL)) {
 		return ERR_ARG;
@@ -1267,12 +1289,12 @@ uint8_t snmp_encode_bits(uint8_t *buf, uint32_t buf_len, uint32_t bit_value, uin
 uint8_t snmp_encode_truthvalue(int32_t *asn1_value, uint32_t bool_value)
 {
 	/* defined by RFC1443:
-	 TruthValue ::= TEXTUAL-CONVENTION
-	  STATUS       current
-	  DESCRIPTION
-	   "Represents a boolean value."
-	  SYNTAX       INTEGER { true(1), false(2) }
-	*/
+	 * TruthValue ::= TEXTUAL-CONVENTION
+	 * STATUS       current
+	 * DESCRIPTION
+	 * "Represents a boolean value."
+	 * SYNTAX       INTEGER { true(1), false(2) }
+	 */
 
 	if (asn1_value == NULL) {
 		return 0;

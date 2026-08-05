@@ -133,13 +133,15 @@ struct snmp_trap_dst {
 static struct snmp_trap_dst trap_dst[SNMP_TRAP_DESTINATIONS];
 
 /** Where traps are encoded. Separate from the response buffer so that a trap
- *  raised while a request is being answered cannot overwrite the reply. */
+ *  raised while a request is being answered cannot overwrite the reply.
+ */
 static uint8_t snmp_trap_buf[CONFIG_SNMP_AGENT_MAX_MSG_SIZE];
 
 static uint8_t snmp_auth_traps_enabled;
 
 /* This is used in functions like snmp_coldstart_trap where user didn't specify which version of
- * trap to use */
+ * trap to use
+ */
 static uint8_t snmp_default_trap_version = SNMP_VERSION_1;
 
 /* This is used in trap messages v2c */
@@ -338,7 +340,7 @@ static int snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *va
 
 	if (tot_len > sizeof(snmp_trap_buf)) {
 		LOG_ERR("trap needs %u bytes, CONFIG_SNMP_AGENT_MAX_MSG_SIZE is %u",
-			(unsigned)tot_len, (unsigned)sizeof(snmp_trap_buf));
+			(unsigned int)tot_len, (unsigned int)sizeof(snmp_trap_buf));
 		return ERR_MEM;
 	}
 
@@ -520,6 +522,7 @@ int snmp_send_trap_generic(int32_t generic_trap)
 
 	if (snmp_default_trap_version == SNMP_VERSION_1) {
 		static const struct snmp_obj_id oid = {7, {1, 3, 6, 1, 2, 1, 11}};
+
 		err = snmp_send_trap_or_notification_or_inform_generic(&trap_msg, &oid,
 								       generic_trap, 0, NULL);
 	} else if (snmp_default_trap_version == SNMP_VERSION_2c) {
@@ -908,7 +911,7 @@ static int snmp_trap_header_enc(struct snmp_msg_trap *trap, struct snmp_pbuf_str
  * @param varbinds linked list of varbinds (at the beginning of this list function will insert 2
  * special purpose varbinds [see RFC 3584])
  * @param ptr_request_id [out] variable in which to store request_id needed to verify
- * acknowledgement
+ * acknowledgment
  * @return ERR_OK if successful
  */
 int snmp_send_inform_specific(int32_t specific_trap, struct snmp_varbind *varbinds,
@@ -925,7 +928,7 @@ int snmp_send_inform_specific(int32_t specific_trap, struct snmp_varbind *varbin
  * @param varbinds linked list of varbinds (at the beginning of this list function will insert 2
  * special purpose varbinds [see RFC 3584])
  * @param ptr_request_id [out] variable in which to store request_id needed to verify
- * acknowledgement
+ * acknowledgment
  * @return ERR_OK if successful
  */
 int snmp_send_inform_generic(int32_t generic_trap, struct snmp_varbind *varbinds,
@@ -943,7 +946,7 @@ int snmp_send_inform_generic(int32_t generic_trap, struct snmp_varbind *varbinds
  * @param varbinds linked list of varbinds (at the beginning of this list function will insert 2
  * special purpose varbinds [see RFC 3584])
  * @param ptr_request_id [out] variable in which to store request_id needed to verify
- * acknowledgement
+ * acknowledgment
  * @return ERR_OK if successful
  */
 int snmp_send_inform(const struct snmp_obj_id *oid, int32_t generic_trap, int32_t specific_trap,

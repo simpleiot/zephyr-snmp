@@ -59,12 +59,14 @@ snmp_err_t snmp_table_get_instance(const uint32_t *root_oid, uint8_t root_oid_le
 	LWIP_UNUSED_ARG(root_oid_len);
 
 	/* check min. length (fixed row entry definition, column, row instance oid with at least one
-	 * entry */
+	 * entry
+	 */
 	/* fixed row entry always has oid 1 */
 	if ((instance->instance_oid.len >= 3) && (instance->instance_oid.id[0] == 1)) {
 		/* search column */
 		const struct snmp_table_col_def *col_def = table_node->columns;
 		uint16_t i = table_node->column_count;
+
 		while (i > 0) {
 			if (col_def->index == instance->instance_oid.id[1]) {
 				break;
@@ -76,7 +78,8 @@ snmp_err_t snmp_table_get_instance(const uint32_t *root_oid, uint8_t root_oid_le
 
 		if (i > 0) {
 			/* everything may be overwritten by get_cell_instance_method() in order to
-			 * implement special handling for single columns/cells */
+			 * implement special handling for single columns/cells
+			 */
 			instance->asn1_type = col_def->asn1_type;
 			instance->access = col_def->access;
 			instance->get_value = table_node->get_value;
@@ -127,6 +130,7 @@ snmp_err_t snmp_table_get_next_instance(const uint32_t *root_oid, uint8_t root_o
 	do {
 		uint16_t i;
 		const struct snmp_table_col_def *next_col_def = NULL;
+
 		col_def = table_node->columns;
 
 		for (i = 0; i < table_node->column_count; i++) {
@@ -157,8 +161,10 @@ snmp_err_t snmp_table_get_next_instance(const uint32_t *root_oid, uint8_t root_o
 			break;
 		}
 
-		row_oid.len = 0; /* reset row_oid because we switch to next column and start with
-				    the first entry there */
+		/* reset row_oid because we switch to the next column and start
+		 * with the first entry there
+		 */
+		row_oid.len = 0;
 		column = next_col_def->index + 1;
 	} while (1);
 
@@ -182,7 +188,8 @@ snmp_err_t snmp_table_simple_get_instance(const uint32_t *root_oid, uint8_t root
 	LWIP_UNUSED_ARG(root_oid_len);
 
 	/* check min. length (fixed row entry definition, column, row instance oid with at least one
-	 * entry */
+	 * entry
+	 */
 	/* fixed row entry always has oid 1 */
 	if ((instance->instance_oid.len >= 3) && (instance->instance_oid.id[0] == 1)) {
 		ret = table_node->get_cell_value(&(instance->instance_oid.id[1]),
@@ -194,6 +201,7 @@ snmp_err_t snmp_table_simple_get_instance(const uint32_t *root_oid, uint8_t root
 			/* search column */
 			const struct snmp_table_simple_col_def *col_def = table_node->columns;
 			uint32_t i = table_node->column_count;
+
 			while (i > 0) {
 				if (col_def->index == instance->instance_oid.id[1]) {
 					break;
@@ -222,9 +230,7 @@ snmp_err_t snmp_table_simple_get_instance(const uint32_t *root_oid, uint8_t root
 						snmp_table_extract_value_from_refconstptr;
 					break;
 				default:
-					LOG_DBG("snmp_table_simple_get_instance(): unknown column "
-						"data_type: %d\n",
-						col_def->data_type);
+					LOG_DBG("unknown column data_type: %d", col_def->data_type);
 					return SNMP_ERR_GENERROR;
 				}
 
@@ -269,6 +275,7 @@ snmp_err_t snmp_table_simple_get_next_instance(const uint32_t *root_oid, uint8_t
 	do {
 		uint32_t i;
 		const struct snmp_table_simple_col_def *next_col_def = NULL;
+
 		col_def = table_node->columns;
 
 		for (i = 0; i < table_node->column_count; i++) {
@@ -297,8 +304,10 @@ snmp_err_t snmp_table_simple_get_next_instance(const uint32_t *root_oid, uint8_t
 			break;
 		}
 
-		row_oid.len = 0; /* reset row_oid because we switch to next column and start with
-				    the first entry there */
+		/* reset row_oid because we switch to the next column and start
+		 * with the first entry there
+		 */
+		row_oid.len = 0;
 		column = next_col_def->index + 1;
 	} while (1);
 
@@ -319,8 +328,7 @@ snmp_err_t snmp_table_simple_get_next_instance(const uint32_t *root_oid, uint8_t
 		instance->get_value = snmp_table_extract_value_from_refconstptr;
 		break;
 	default:
-		LOG_DBG("snmp_table_simple_get_instance(): unknown column data_type: %d\n",
-			col_def->data_type);
+		LOG_DBG("unknown column data_type: %d", col_def->data_type);
 		return SNMP_ERR_GENERROR;
 	}
 

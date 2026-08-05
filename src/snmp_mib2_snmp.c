@@ -52,6 +52,7 @@ LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 static int16_t snmp_get_value(const struct snmp_scalar_array_node_def *node, void *value)
 {
 	uint32_t *uint_ptr = (uint32_t *)value;
+
 	switch (node->oid) {
 	case 1: /* snmpInPkts */
 		*uint_ptr = snmp_stats.inpkts;
@@ -148,7 +149,7 @@ static int16_t snmp_get_value(const struct snmp_scalar_array_node_def *node, voi
 		*uint_ptr = 0; /* not supported */
 		break;
 	default:
-		LOG_DBG("snmp_get_value(): unknown id: %d", node->oid);
+		LOG_DBG("get: unknown id %d", node->oid);
 		return 0;
 	}
 
@@ -159,6 +160,7 @@ static snmp_err_t snmp_set_test(const struct snmp_scalar_array_node_def *node, u
 				void *value)
 {
 	snmp_err_t ret = SNMP_ERR_WRONGVALUE;
+
 	LWIP_UNUSED_ARG(len);
 
 	if (node->oid == 30) {
@@ -182,6 +184,7 @@ static snmp_err_t snmp_set_value(const struct snmp_scalar_array_node_def *node, 
 	if (node->oid == 30) {
 		/* snmpEnableAuthenTraps */
 		int32_t *sint_ptr = (int32_t *)value;
+
 		if (*sint_ptr == MIB2_AUTH_TRAPS_DISABLED) {
 			snmp_set_auth_traps_enabled(SNMP_AUTH_TRAPS_DISABLED);
 		} else {
@@ -193,7 +196,8 @@ static snmp_err_t snmp_set_value(const struct snmp_scalar_array_node_def *node, 
 }
 
 /* the following nodes access variables in SNMP stack (snmp_stats) from SNMP worker thread -> OK, no
- * sync needed */
+ * sync needed
+ */
 static const struct snmp_scalar_array_node_def snmp_nodes[] = {
 	{1, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},   /* snmpInPkts */
 	{2, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},   /* snmpOutPkts */

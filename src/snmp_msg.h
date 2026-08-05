@@ -77,6 +77,9 @@ snmp_vb_enumerator_err_t snmp_vb_enumerator_get_next(struct snmp_varbind_enumera
 
 #define SNMP_MAX_COMMUNITY_SIZE 12U
 
+/** Bytes of the scratch buffer each request carries for varbind values. */
+#define SNMP_VALUE_BUFFER_SIZE 64
+
 struct snmp_request {
 	/* Communication handle */
 	void *handle;
@@ -122,9 +125,6 @@ struct snmp_request {
 	uint16_t outbound_error_status_offset;
 	uint16_t outbound_error_index_offset;
 	uint16_t outbound_varbind_offset;
-
-// uint8_t value_buffer[SNMP_MAX_VALUE_SIZE];
-#define SNMP_VALUE_BUFFER_SIZE 64
 
 	uint8_t value_buffer[SNMP_VALUE_BUFFER_SIZE];
 };

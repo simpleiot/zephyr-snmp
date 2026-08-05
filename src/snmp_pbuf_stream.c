@@ -133,6 +133,7 @@ int snmp_pbuf_stream_seek(struct snmp_pbuf_stream *pbuf_stream, int32_t offset)
 int snmp_pbuf_stream_seek_abs(struct snmp_pbuf_stream *pbuf_stream, uint32_t offset)
 {
 	int32_t rel_offset = offset - pbuf_stream->offset;
+
 	return snmp_pbuf_stream_seek(pbuf_stream, rel_offset);
 }
 

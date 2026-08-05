@@ -49,11 +49,10 @@ jobs:
             --inline-logs \
             --verbose
 
-      # Style is a convention of this repository rather than a gate, so report
-      # problems without failing the run.
+      # Style settings come from .checkpatch.conf; the typedefs list it relies
+      # on ships with Zephyr, so point at the copy in the workspace.
       - name: Run checkpatch on the changes
         if: always()
-        continue-on-error: true
         working-directory: modules/lib/zephyr-snmp
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -62,7 +61,8 @@ jobs:
           base="${BASE_SHA:-HEAD~1}"
           zephyr_base="$(west list -f '{abspath}' zephyr)"
           git diff "$base"..HEAD | \
-            "$zephyr_base/scripts/checkpatch.pl" --no-tree -
+            "$zephyr_base/scripts/checkpatch.pl" --no-tree \
+              --typedefsfile="$zephyr_base/scripts/checkpatch/typedefsfile" -
 
       - name: Upload results
         if: always()

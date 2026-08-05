@@ -141,7 +141,8 @@ static void snmp_service_cb(struct net_socket_service_event *evt)
 
 		/* The socket is passed as an opaque handle because that is
 		 * what the agent core hands back to snmp_sendto() when it
-		 * wants to reply. */
+		 * wants to reply.
+		 */
 		snmp_receive((void *)(intptr_t)evt->event.fd, recv_buf, (uint16_t)ret,
 			     &from_address, from.sin_port);
 	}
@@ -198,7 +199,8 @@ int net_snmp_agent_start(void)
 	agent_sock = sock;
 
 	/* Traps leave from the same socket. Their destination is still the
-	 * manager's port 162; only the source port is shared. */
+	 * manager's port 162; only the source port is shared.
+	 */
 	snmp_traps_handle = (void *)(intptr_t)sock;
 
 	LOG_INF("SNMP agent listening on UDP port %d", CONFIG_SNMP_AGENT_PORT);
@@ -221,7 +223,8 @@ int net_snmp_agent_stop(void)
 	}
 
 	/* Unregister before closing, so the service thread cannot poll a
-	 * descriptor that has already been handed back. */
+	 * descriptor that has already been handed back.
+	 */
 	ret = net_socket_service_unregister(&snmp_service);
 	if (ret < 0) {
 		LOG_ERR("cannot unregister the socket service, %d", ret);
@@ -325,13 +328,14 @@ const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len, const ui
 
 	for (index = 0; index < count && length < buf_size - 1; index++) {
 		int written = snprintf(buf + length, buf_size - length, (index == 0) ? "%u" : ".%u",
-				       (unsigned)oid_words[index]);
+				       (unsigned int)oid_words[index]);
 
 		if (written < 0) {
 			break;
 		}
 		/* snprintf() reports what it would have written, so stop at
-		 * the point where the buffer ran out rather than past it. */
+		 * the point where the buffer ran out rather than past it.
+		 */
 		if ((size_t)written >= buf_size - length) {
 			length = buf_size - 1;
 			break;

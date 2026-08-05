@@ -68,7 +68,8 @@ int snmp_ans1_enc_tlv(struct snmp_pbuf_stream *pbuf_stream, struct snmp_asn1_tlv
 	}
 	if (tlv->type_len != 0) {
 		/* any other value as auto is not accepted for type (we always use one byte because
-		 * extended syntax is prohibited) */
+		 * extended syntax is prohibited)
+		 */
 		return ERR_ARG;
 	}
 
@@ -99,8 +100,8 @@ int snmp_ans1_enc_tlv(struct snmp_pbuf_stream *pbuf_stream, struct snmp_asn1_tlv
 	if (length_bytes_required > 1) {
 		/* multi byte representation required */
 		length_bytes_required--;
-		data = 0x80 | length_bytes_required; /* extended length definition, 1 length byte
-							follows */
+		/* extended length definition, 1 length byte follows */
+		data = 0x80 | length_bytes_required;
 
 		PBUF_OP_EXEC(snmp_pbuf_stream_write(pbuf_stream, data));
 
@@ -210,12 +211,14 @@ int snmp_asn1_enc_oid(struct snmp_pbuf_stream *pbuf_stream, const uint32_t *oid,
 	if (oid_len > 1) {
 		/* write compressed first two sub id's */
 		uint32_t compressed_byte = ((oid[0] * 40) + oid[1]);
+
 		PBUF_OP_EXEC(snmp_pbuf_stream_write(pbuf_stream, (uint8_t)compressed_byte));
 		oid_len -= 2;
 		oid += 2;
 	} else {
 		/* @bug:  allow empty varbinds for symmetry (we must decode them for getnext), allow
-		 * partial compression?? */
+		 * partial compression??
+		 */
 		/* ident_len <= 1, at least we need zeroDotZero (0.0) (ident_len == 2) */
 		return ERR_ARG;
 	}
@@ -373,6 +376,7 @@ int snmp_asn1_dec_tlv(struct snmp_pbuf_stream *pbuf_stream, struct snmp_asn1_tlv
 		tlv->value_len = data;
 	} else if (data > 0x80) { /* long form */
 		uint8_t length_bytes = data - 0x80;
+
 		if (length_bytes > pbuf_stream->length) {
 			return ERR_VAL;
 		}
@@ -382,7 +386,8 @@ int snmp_asn1_dec_tlv(struct snmp_pbuf_stream *pbuf_stream, struct snmp_asn1_tlv
 
 		while (length_bytes > 0) {
 			/* we only support up to u16.maxvalue-1 (2 bytes) but have to accept leading
-			 * zero bytes */
+			 * zero bytes
+			 */
 			if (tlv->value_len > 0xFF) {
 				return ERR_VAL;
 			}
@@ -548,6 +553,7 @@ int snmp_asn1_dec_oid(struct snmp_pbuf_stream *pbuf_stream, uint16_t len, uint32
 		} else {
 			/* sub-identifier uses multiple octets */
 			uint32_t sub_id = (data & ~0x80);
+
 			while ((len > 0) && ((data & 0x80) != 0)) {
 				PBUF_OP_EXEC(snmp_pbuf_stream_read(pbuf_stream, &data));
 				len--;

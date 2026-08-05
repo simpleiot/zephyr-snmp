@@ -125,7 +125,8 @@ int main(void)
 	snmp_describe_device();
 
 	/* The socket binds to any address, so there is no need to wait for
-	 * an IPv4 address to be assigned first. */
+	 * an IPv4 address to be assigned first.
+	 */
 	ret = net_snmp_agent_start();
 	if (ret < 0) {
 		printk("SNMP: cannot start the agent: %d\n", ret);

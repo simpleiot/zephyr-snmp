@@ -63,31 +63,28 @@ static const uint16_t *sysdescr_len; /* use strlen for determining len */
 static const uint8_t syscontact_default[] = SNMP_LWIP_MIB2_SYSCONTACT;
 static const uint8_t *syscontact = syscontact_default;
 static const uint16_t *syscontact_len; /* use strlen for determining len */
-static uint8_t *syscontact_wr;      /* if writable, points to the same buffer as syscontact
-					      (required for correct constness) */
-static uint16_t *syscontact_wr_len; /* if writable, points to the same buffer as
-					      syscontact_len (required for correct constness) */
-static uint16_t syscontact_bufsize;    /* 0=not writable */
+/* The writable aliases point at the same buffers as the const pointers above;
+ * the duplication is what keeps the read-only views correctly const.
+ */
+static uint8_t *syscontact_wr;
+static uint16_t *syscontact_wr_len;
+static uint16_t syscontact_bufsize; /* 0=not writable */
 
 /** mib-2.system.sysName */
 static const uint8_t sysname_default[] = SNMP_LWIP_MIB2_SYSNAME;
 static const uint8_t *sysname = sysname_default;
 static const uint16_t *sysname_len; /* use strlen for determining len */
-static uint8_t *sysname_wr; /* if writable, points to the same buffer as sysname (required
-				      for correct constness) */
-static uint16_t *sysname_wr_len; /* if writable, points to the same buffer as sysname_len
-					   (required for correct constness) */
-static uint16_t sysname_bufsize;    /* 0=not writable */
+static uint8_t *sysname_wr;
+static uint16_t *sysname_wr_len;
+static uint16_t sysname_bufsize; /* 0=not writable */
 
 /** mib-2.system.sysLocation */
 static const uint8_t syslocation_default[] = SNMP_LWIP_MIB2_SYSLOCATION;
 static const uint8_t *syslocation = syslocation_default;
 static const uint16_t *syslocation_len; /* use strlen for determining len */
-static uint8_t *syslocation_wr;      /* if writable, points to the same buffer as syslocation
-					       (required for correct constness) */
-static uint16_t *syslocation_wr_len; /* if writable, points to the same buffer as
-					       syslocation_len (required for correct constness) */
-static uint16_t syslocation_bufsize;    /* 0=not writable */
+static uint8_t *syslocation_wr;
+static uint16_t *syslocation_wr_len;
+static uint16_t syslocation_bufsize; /* 0=not writable */
 
 /**
  * @ingroup snmp_mib2
@@ -239,10 +236,10 @@ static const char *const oid_names[] = {
 	"oidNull",    "sysDescr", "sysObjectID", "sysUpTime",
 	"sysContact", "sysName",  "sysLocation", "sysServices",
 };
-// #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
+
 static const char *oid_name(int index)
 {
-	if (index < (sizeof oid_names / sizeof oid_names[0])) {
+	if (index >= 0 && index < (int)ARRAY_SIZE(oid_names)) {
 		return oid_names[index];
 	}
 	return "oidUnknown";
@@ -254,7 +251,7 @@ static int16_t system_get_value(const struct snmp_scalar_array_node_def *node, v
 	const int16_t *var_len;
 	uint16_t result;
 
-	LOG_DBG("system_get_value(%d): %s", (int)node->oid, oid_name(node->oid));
+	LOG_DBG("get id %d (%s)", (int)node->oid, oid_name(node->oid));
 
 	switch (node->oid) {
 	case 1: /* sysDescr */
@@ -263,6 +260,7 @@ static int16_t system_get_value(const struct snmp_scalar_array_node_def *node, v
 		break;
 	case 2: { /* sysObjectID */
 		const struct snmp_obj_id *dev_enterprise_oid = snmp_get_device_enterprise_oid();
+
 		MEMCPY(value, dev_enterprise_oid->id, dev_enterprise_oid->len * sizeof(uint32_t));
 		return dev_enterprise_oid->len * sizeof(uint32_t);
 	}
@@ -285,7 +283,7 @@ static int16_t system_get_value(const struct snmp_scalar_array_node_def *node, v
 		*(int32_t *)value = SNMP_SYSSERVICES;
 		return sizeof(int32_t);
 	default:
-		LOG_DBG("system_get_value(): unknown id: %d", node->oid);
+		LOG_DBG("get: unknown id %d", node->oid);
 		return 0;
 	}
 
@@ -323,7 +321,7 @@ static snmp_err_t system_set_test(const struct snmp_scalar_array_node_def *node,
 		var_wr_len = syslocation_wr_len;
 		break;
 	default:
-		LOG_DBG("system_set_test(): unknown id: %d", node->oid);
+		LOG_DBG("set test: unknown id %d", node->oid);
 		return ret;
 	}
 
@@ -366,7 +364,7 @@ static snmp_err_t system_set_value(const struct snmp_scalar_array_node_def *node
 		var_wr_len = syslocation_wr_len;
 		break;
 	default:
-		LOG_DBG("system_set_value(): unknown id: %d", node->oid);
+		LOG_DBG("set: unknown id %d", node->oid);
 		return SNMP_ERR_GENERROR;
 	}
 

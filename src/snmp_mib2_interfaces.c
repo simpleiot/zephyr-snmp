@@ -242,7 +242,8 @@ static int16_t interfaces_Table_get_value(struct snmp_node_instance *instance, v
 
 		if (ret < 0) {
 			/* No name configured; report the index instead of an
-			 * empty string, which managers display poorly. */
+			 * empty string, which managers display poorly.
+			 */
 			value_len = (uint16_t)snprintf(name, sizeof(name), "if%d",
 						       net_if_get_by_iface(iface));
 		} else {
@@ -289,7 +290,8 @@ static int16_t interfaces_Table_get_value(struct snmp_node_instance *instance, v
 		break;
 	case 9: /* ifLastChange */
 		/* Zephyr does not record when the interface last changed
-		 * state, so report 0, meaning "before the agent started". */
+		 * state, so report 0, meaning "before the agent started".
+		 */
 		*value_u32 = 0;
 		value_len = sizeof(*value_u32);
 		break;
@@ -352,7 +354,8 @@ static const struct snmp_table_col_def interfaces_Table_columns[] = {
 };
 
 /* Every column is read-only: bringing an interface down over SNMP would cut
- * the path the request arrived on. */
+ * the path the request arrived on.
+ */
 static const struct snmp_table_node interfaces_Table = SNMP_TABLE_CREATE(
 	2, interfaces_Table_columns, interfaces_Table_get_cell_instance,
 	interfaces_Table_get_next_cell_instance, interfaces_Table_get_value, NULL, NULL);

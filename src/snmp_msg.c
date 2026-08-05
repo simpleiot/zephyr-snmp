@@ -211,23 +211,23 @@ static const char *request_name(int request)
 {
 	switch (request) {
 	case SNMP_ASN1_CONTEXT_PDU_GET_REQ:
-		return "GET_REQ"; // 0
+		return "GET_REQ";
 	case SNMP_ASN1_CONTEXT_PDU_GET_NEXT_REQ:
-		return "GET_NEXT_REQ"; // 1
+		return "GET_NEXT_REQ";
 	case SNMP_ASN1_CONTEXT_PDU_GET_RESP:
-		return "GET_RESP"; // 2
+		return "GET_RESP";
 	case SNMP_ASN1_CONTEXT_PDU_SET_REQ:
-		return "SET_REQ"; // 3
+		return "SET_REQ";
 	case SNMP_ASN1_CONTEXT_PDU_TRAP:
-		return "TRAP"; // 4
+		return "TRAP";
 	case SNMP_ASN1_CONTEXT_PDU_GET_BULK_REQ:
-		return "GET_BULK_REQ"; // 5
+		return "GET_BULK_REQ";
 	case SNMP_ASN1_CONTEXT_PDU_INFORM_REQ:
-		return "INFORM_REQ"; // 6
+		return "INFORM_REQ";
 	case SNMP_ASN1_CONTEXT_PDU_V2_TRAP:
-		return "V2_TRAP"; // 7
+		return "V2_TRAP";
 	case SNMP_ASN1_CONTEXT_PDU_REPORT:
-		return "REPORT"; // 8
+		return "REPORT";
 	}
 	return "GET_UNKNOWN";
 }
@@ -250,8 +250,7 @@ void snmp_receive(void *handle, uint8_t *data, uint16_t len, const struct net_in
 	snmp_stats.inpkts++;
 
 	err = snmp_parse_inbound_frame(&request);
-	LOG_DBG("snmp_receive: snmp_parse returns %02X type %s", err,
-		request_name(request.request_type));
+	LOG_DBG("parse returns %02X type %s", err, request_name(request.request_type));
 
 	if (err == ERR_OK) {
 		if (request.request_type == SNMP_ASN1_CONTEXT_PDU_GET_RESP) {
@@ -260,9 +259,9 @@ void snmp_receive(void *handle, uint8_t *data, uint16_t len, const struct net_in
 				struct snmp_varbind vb;
 				char oid_str[SNMP_OID_STR_LEN];
 
-				LOG_DBG("snmp_receive: received a get-response");
+				LOG_DBG("received a get-response");
 
-				memset(&vb, 0, sizeof vb);
+				memset(&vb, 0, sizeof(vb));
 				vb.object_value = request.value_buffer;
 
 				LOG_DBG("SNMP_get_request %d", request.request_type);
@@ -291,7 +290,8 @@ void snmp_receive(void *handle, uint8_t *data, uint16_t len, const struct net_in
 
 			if (request.error_status == SNMP_ERR_NOERROR) {
 				/* only process frame if we do not already have an error to return
-				 * (e.g. all readonly) */
+				 * (e.g. all readonly)
+				 */
 				if (request.request_type == SNMP_ASN1_CONTEXT_PDU_GET_REQ) {
 					err = snmp_process_get_request(&request);
 				} else if (request.request_type ==
@@ -352,10 +352,12 @@ static void snmp_process_varbind(struct snmp_request *request, struct snmp_varbi
 {
 	int err;
 	struct snmp_node_instance node_instance;
+
 	memset(&node_instance, 0, sizeof(node_instance));
 
 	if (get_next) {
 		struct snmp_obj_id result_oid;
+
 		request->error_status = snmp_get_next_node_instance_from_oid(
 			vb->oid.id, vb->oid.len, snmp_msg_getnext_validate_node_inst, request,
 			&result_oid, &node_instance);
@@ -369,7 +371,8 @@ static void snmp_process_varbind(struct snmp_request *request, struct snmp_varbi
 
 		if (request->error_status == SNMP_ERR_NOERROR) {
 			/* use 'getnext_validate' method for validation to avoid code duplication
-			 * (some checks have to be executed here) */
+			 * (some checks have to be executed here)
+			 */
 			request->error_status =
 				snmp_msg_getnext_validate_node_inst(&node_instance, request);
 
@@ -386,7 +389,8 @@ static void snmp_process_varbind(struct snmp_request *request, struct snmp_varbi
 			if ((request->version == SNMP_VERSION_2c) ||
 			    request->version == SNMP_VERSION_3) {
 				/* in SNMP v2c a varbind related exception is stored in varbind and
-				 * not in frame header */
+				 * not in frame header
+				 */
 				vb->type =
 					(SNMP_ASN1_CONTENTTYPE_PRIMITIVE | SNMP_ASN1_CLASS_CONTEXT |
 					 (request->error_status & SNMP_VARBIND_EXCEPTION_MASK));
@@ -420,7 +424,7 @@ static void snmp_process_varbind(struct snmp_request *request, struct snmp_varbi
 				len = node_instance.get_value(&node_instance, vb->object_value);
 				if (len <= 0) {
 					/* Log this event, just for debugging. */
-					LOG_DBG("snmp_process_varbind: no value found for %s", ptr);
+					LOG_DBG("no value found for %s", ptr);
 				}
 			}
 		}
@@ -460,7 +464,7 @@ static int snmp_process_get_request(struct snmp_request *request)
 	struct snmp_varbind vb;
 	char oid_str[SNMP_OID_STR_LEN];
 
-	memset(&vb, 0, sizeof vb);
+	memset(&vb, 0, sizeof(vb));
 	vb.object_value = request->value_buffer;
 
 	LOG_DBG("SNMP_get_request %d", request->request_type);
@@ -468,22 +472,27 @@ static int snmp_process_get_request(struct snmp_request *request)
 	while (request->error_status == SNMP_ERR_NOERROR) {
 		err = snmp_vb_enumerator_get_next(&request->inbound_varbind_enumerator, &vb);
 
-		if (err == SNMP_VB_ENUMERATOR_ERR_OK) {
-			LOG_DBG("getRequest %s",
-				snmp_oid_to_str(oid_str, sizeof(oid_str), vb.oid.len, vb.oid.id));
-
-			if ((vb.type == SNMP_ASN1_TYPE_NULL) && (vb.value_len == 0)) {
-				snmp_process_varbind(request, &vb, 0);
-			} else {
-				request->error_status = SNMP_ERR_GENERROR;
-			}
-		} else if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
+		if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
 			/* no more varbinds in request */
 			break;
-		} else if (err == SNMP_VB_ENUMERATOR_ERR_ASN1ERROR) {
+		}
+
+		if (err == SNMP_VB_ENUMERATOR_ERR_ASN1ERROR) {
 			/* malformed ASN.1, don't answer */
-			LOG_WRN("snmp_process_get_request: malformed ASN.1, not answering");
+			LOG_WRN("malformed ASN.1, not answering");
 			return ERR_ARG;
+		}
+
+		if (err != SNMP_VB_ENUMERATOR_ERR_OK) {
+			request->error_status = SNMP_ERR_GENERROR;
+			break;
+		}
+
+		LOG_DBG("getRequest %s",
+			snmp_oid_to_str(oid_str, sizeof(oid_str), vb.oid.len, vb.oid.id));
+
+		if ((vb.type == SNMP_ASN1_TYPE_NULL) && (vb.value_len == 0)) {
+			snmp_process_varbind(request, &vb, 0);
 		} else {
 			request->error_status = SNMP_ERR_GENERROR;
 		}
@@ -501,24 +510,30 @@ static int snmp_process_getnext_request(struct snmp_request *request)
 {
 	snmp_vb_enumerator_err_t err;
 	struct snmp_varbind vb;
+
 	vb.object_value = request->value_buffer;
 
 	LOG_DBG("SNMP get-next request\n");
 
 	while (request->error_status == SNMP_ERR_NOERROR) {
 		err = snmp_vb_enumerator_get_next(&request->inbound_varbind_enumerator, &vb);
-		if (err == SNMP_VB_ENUMERATOR_ERR_OK) {
-			if ((vb.type == SNMP_ASN1_TYPE_NULL) && (vb.value_len == 0)) {
-				snmp_process_varbind(request, &vb, 1);
-			} else {
-				request->error_status = SNMP_ERR_GENERROR;
-			}
-		} else if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
+		if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
 			/* no more varbinds in request */
 			break;
-		} else if (err == SNMP_VB_ENUMERATOR_ERR_ASN1ERROR) {
+		}
+
+		if (err == SNMP_VB_ENUMERATOR_ERR_ASN1ERROR) {
 			/* malformed ASN.1, don't answer */
 			return ERR_ARG;
+		}
+
+		if (err != SNMP_VB_ENUMERATOR_ERR_OK) {
+			request->error_status = SNMP_ERR_GENERROR;
+			break;
+		}
+
+		if ((vb.type == SNMP_ASN1_TYPE_NULL) && (vb.value_len == 0)) {
+			snmp_process_varbind(request, &vb, 1);
 		} else {
 			request->error_status = SNMP_ERR_GENERROR;
 		}
@@ -540,6 +555,7 @@ static int snmp_process_getbulk_request(struct snmp_request *request)
 	uint16_t repetition_offset = 0;
 	struct snmp_varbind_enumerator repetition_varbind_enumerator;
 	struct snmp_varbind vb;
+
 	vb.object_value = request->value_buffer;
 
 	if (SNMP_LWIP_GETBULK_MAX_REPETITIONS > 0) {
@@ -590,33 +606,37 @@ static int snmp_process_getbulk_request(struct snmp_request *request)
 		repetition_offset = request->outbound_pbuf_stream.offset; /* for next loop */
 
 		while (request->error_status == SNMP_ERR_NOERROR) {
-			vb.object_value = NULL; /* do NOT decode value (we enumerate outbound buffer
-						   here, so all varbinds have values assigned) */
+			/* do NOT decode the value: this enumerates the outbound
+			 * buffer, so every varbind already has a value assigned.
+			 */
+			vb.object_value = NULL;
 			err = snmp_vb_enumerator_get_next(&repetition_varbind_enumerator, &vb);
-			if (err == SNMP_VB_ENUMERATOR_ERR_OK) {
-				vb.object_value = request->value_buffer;
-				snmp_process_varbind(request, &vb, 1);
-
-				if (request->error_status != SNMP_ERR_NOERROR) {
-					/* already set correct error-index (here it cannot be taken
-					 * from inbound varbind enumerator) */
-					request->error_index =
-						request->non_repeaters +
-						repetition_varbind_enumerator.varbind_count;
-				} else if (vb.type != (SNMP_ASN1_CONTENTTYPE_PRIMITIVE |
-						       SNMP_ASN1_CLASS_CONTEXT |
-						       SNMP_ASN1_CONTEXT_VARBIND_END_OF_MIB_VIEW)) {
-					all_endofmibview = 0;
-				}
-			} else if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
+			if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
 				/* no more varbinds in request */
 				break;
-			} else {
-				LOG_DBG("Very strange, we cannot parse the varbind output that we "
-					"created just before!\n");
+			}
+
+			if (err != SNMP_VB_ENUMERATOR_ERR_OK) {
+				LOG_DBG("cannot parse the varbind output written just before");
 				request->error_status = SNMP_ERR_GENERROR;
 				request->error_index = request->non_repeaters +
 						       repetition_varbind_enumerator.varbind_count;
+				break;
+			}
+
+			vb.object_value = request->value_buffer;
+			snmp_process_varbind(request, &vb, 1);
+
+			if (request->error_status != SNMP_ERR_NOERROR) {
+				/* already set correct error-index (here it cannot be taken
+				 * from inbound varbind enumerator)
+				 */
+				request->error_index = request->non_repeaters +
+						       repetition_varbind_enumerator.varbind_count;
+			} else if (vb.type !=
+				   (SNMP_ASN1_CONTENTTYPE_PRIMITIVE | SNMP_ASN1_CLASS_CONTEXT |
+				    SNMP_ASN1_CONTEXT_VARBIND_END_OF_MIB_VIEW)) {
+				all_endofmibview = 0;
 			}
 		}
 
@@ -630,7 +650,8 @@ static int snmp_process_getbulk_request(struct snmp_request *request)
 
 	if (request->error_status == SNMP_ERR_TOOBIG) {
 		/* for GetBulk it is ok, if not all requested variables fit into the response ->
-		 * just return the varbinds added so far */
+		 * just return the varbinds added so far
+		 */
 		request->error_status = SNMP_ERR_NOERROR;
 	}
 
@@ -646,49 +667,55 @@ static int snmp_process_set_request(struct snmp_request *request)
 {
 	snmp_vb_enumerator_err_t err;
 	struct snmp_varbind vb;
+
 	vb.object_value = request->value_buffer;
 
 	LOG_DBG("SNMP set request\n");
 
 	/* perform set test on all objects */
 	while (request->error_status == SNMP_ERR_NOERROR) {
+		struct snmp_node_instance node_instance;
+
 		err = snmp_vb_enumerator_get_next(&request->inbound_varbind_enumerator, &vb);
-		if (err == SNMP_VB_ENUMERATOR_ERR_OK) {
-			struct snmp_node_instance node_instance;
-			memset(&node_instance, 0, sizeof(node_instance));
-
-			request->error_status = snmp_get_node_instance_from_oid(
-				vb.oid.id, vb.oid.len, &node_instance);
-			if (request->error_status == SNMP_ERR_NOERROR) {
-				if (node_instance.asn1_type != vb.type) {
-					request->error_status = SNMP_ERR_WRONGTYPE;
-				} else if (((node_instance.access &
-					     SNMP_NODE_INSTANCE_ACCESS_WRITE) !=
-					    SNMP_NODE_INSTANCE_ACCESS_WRITE) ||
-					   (node_instance.set_value == NULL)) {
-					request->error_status = SNMP_ERR_NOTWRITABLE;
-				} else {
-					if (node_instance.set_test != NULL) {
-						request->error_status = node_instance.set_test(
-							&node_instance, vb.value_len,
-							vb.object_value);
-					}
-				}
-
-				if (node_instance.release_instance != NULL) {
-					node_instance.release_instance(&node_instance);
-				}
-			}
-		} else if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
+		if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
 			/* no more varbinds in request */
 			break;
-		} else if (err == SNMP_VB_ENUMERATOR_ERR_INVALIDLENGTH) {
-			request->error_status = SNMP_ERR_WRONGLENGTH;
-		} else if (err == SNMP_VB_ENUMERATOR_ERR_ASN1ERROR) {
+		}
+
+		if (err == SNMP_VB_ENUMERATOR_ERR_ASN1ERROR) {
 			/* malformed ASN.1, don't answer */
 			return ERR_ARG;
-		} else {
+		}
+
+		if (err == SNMP_VB_ENUMERATOR_ERR_INVALIDLENGTH) {
+			request->error_status = SNMP_ERR_WRONGLENGTH;
+			break;
+		}
+
+		if (err != SNMP_VB_ENUMERATOR_ERR_OK) {
 			request->error_status = SNMP_ERR_GENERROR;
+			break;
+		}
+
+		memset(&node_instance, 0, sizeof(node_instance));
+
+		request->error_status =
+			snmp_get_node_instance_from_oid(vb.oid.id, vb.oid.len, &node_instance);
+		if (request->error_status == SNMP_ERR_NOERROR) {
+			if (node_instance.asn1_type != vb.type) {
+				request->error_status = SNMP_ERR_WRONGTYPE;
+			} else if (((node_instance.access & SNMP_NODE_INSTANCE_ACCESS_WRITE) !=
+				    SNMP_NODE_INSTANCE_ACCESS_WRITE) ||
+				   (node_instance.set_value == NULL)) {
+				request->error_status = SNMP_ERR_NOTWRITABLE;
+			} else if (node_instance.set_test != NULL) {
+				request->error_status = node_instance.set_test(
+					&node_instance, vb.value_len, vb.object_value);
+			}
+
+			if (node_instance.release_instance != NULL) {
+				node_instance.release_instance(&node_instance);
+			}
 		}
 	}
 
@@ -698,39 +725,41 @@ static int snmp_process_set_request(struct snmp_request *request)
 					request->inbound_varbind_offset,
 					request->inbound_varbind_len);
 		while (request->error_status == SNMP_ERR_NOERROR) {
+			struct snmp_node_instance node_instance;
+
 			err = snmp_vb_enumerator_get_next(&request->inbound_varbind_enumerator,
 							  &vb);
-			if (err == SNMP_VB_ENUMERATOR_ERR_OK) {
-				struct snmp_node_instance node_instance;
-				memset(&node_instance, 0, sizeof(node_instance));
-				request->error_status = snmp_get_node_instance_from_oid(
-					vb.oid.id, vb.oid.len, &node_instance);
-				if (request->error_status == SNMP_ERR_NOERROR) {
-					if (node_instance.set_value(&node_instance, vb.value_len,
-								    vb.object_value) !=
-					    SNMP_ERR_NOERROR) {
-						if (request->inbound_varbind_enumerator
-							    .varbind_count == 1) {
-							request->error_status =
-								SNMP_ERR_COMMITFAILED;
-						} else {
-							/* we cannot undo the set operations done so
-							 * far */
-							request->error_status = SNMP_ERR_UNDOFAILED;
-						}
-					}
-
-					if (node_instance.release_instance != NULL) {
-						node_instance.release_instance(&node_instance);
-					}
-				}
-			} else if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
+			if (err == SNMP_VB_ENUMERATOR_ERR_EOVB) {
 				/* no more varbinds in request */
 				break;
-			} else {
-				/* first time enumerating varbinds work but second time not,
-				 * although nothing should have changed in between ??? */
+			}
+
+			if (err != SNMP_VB_ENUMERATOR_ERR_OK) {
+				/* enumerating the varbinds succeeded the first time but not
+				 * the second, although nothing should have changed in between
+				 */
 				request->error_status = SNMP_ERR_GENERROR;
+				break;
+			}
+
+			memset(&node_instance, 0, sizeof(node_instance));
+			request->error_status = snmp_get_node_instance_from_oid(
+				vb.oid.id, vb.oid.len, &node_instance);
+			if (request->error_status == SNMP_ERR_NOERROR) {
+				if (node_instance.set_value(&node_instance, vb.value_len,
+							    vb.object_value) != SNMP_ERR_NOERROR) {
+					if (request->inbound_varbind_enumerator.varbind_count ==
+					    1) {
+						request->error_status = SNMP_ERR_COMMITFAILED;
+					} else {
+						/* we cannot undo the set operations done so far */
+						request->error_status = SNMP_ERR_UNDOFAILED;
+					}
+				}
+
+				if (node_instance.release_instance != NULL) {
+					node_instance.release_instance(&node_instance);
+				}
 			}
 		}
 	}
@@ -779,7 +808,7 @@ static int snmp_parse_inbound_frame(struct snmp_request *request)
 	int32_t s32_value;
 	int err;
 
-	memset(&tlv, 0, sizeof tlv);
+	memset(&tlv, 0, sizeof(tlv));
 	IF_PARSE_EXEC(
 		snmp_pbuf_stream_init(&pbuf_stream, request->inbound_buf, 0, request->inbound_len));
 
@@ -787,10 +816,9 @@ static int snmp_parse_inbound_frame(struct snmp_request *request)
 	IF_PARSE_EXEC(snmp_asn1_dec_tlv(&pbuf_stream, &tlv));
 
 	if ((tlv.type != SNMP_ASN1_TYPE_SEQUENCE) || (tlv.value_len != pbuf_stream.length)) {
-		LOG_WRN("snmp_parse: type %d, expected ASN.1 type %d; value_len %u, stream length "
-			"%u",
-			tlv.type, SNMP_ASN1_TYPE_SEQUENCE, (unsigned)tlv.value_len,
-			(unsigned)pbuf_stream.length);
+		LOG_WRN("type %d, expected ASN.1 type %d; value_len %u, stream length %u", tlv.type,
+			SNMP_ASN1_TYPE_SEQUENCE, (unsigned int)tlv.value_len,
+			(unsigned int)pbuf_stream.length);
 	}
 
 	IF_PARSE_ASSERT((tlv.type == SNMP_ASN1_TYPE_SEQUENCE) &&
@@ -806,7 +834,7 @@ static int snmp_parse_inbound_frame(struct snmp_request *request)
 	IF_PARSE_EXEC(snmp_asn1_dec_s32t(&pbuf_stream, tlv.value_len, &s32_value));
 
 	if (((s32_value != SNMP_VERSION_1) && (s32_value != SNMP_VERSION_2c))) {
-		LOG_WRN("snmp_parse: unsupported SNMP version %d", (int)s32_value);
+		LOG_WRN("unsupported SNMP version %d", (int)s32_value);
 		/* unsupported SNMP version */
 		snmp_stats.inbadversions++;
 		/* Returning a "err_enum_t" where a "int" is expected */
@@ -825,7 +853,8 @@ static int snmp_parse_inbound_frame(struct snmp_request *request)
 					&request->community_strlen, SNMP_MAX_COMMUNITY_STR_LEN);
 		if (err == ERR_MEM) {
 			/* community string does not fit in our buffer -> its too long -> its
-			 * invalid */
+			 * invalid
+			 */
 			request->community_strlen = 0;
 			snmp_pbuf_stream_seek(&pbuf_stream, tlv.value_len);
 		} else {
@@ -888,7 +917,8 @@ static int snmp_parse_inbound_frame(struct snmp_request *request)
 				     SNMP_ASN1_CONTEXT_PDU_GET_RESP);
 
 	/* validate community (do this after decoding PDU type because we don't want to increase
-	 * 'inbadcommunitynames' for wrong frame types */
+	 * 'inbadcommunitynames' for wrong frame types
+	 */
 	if (request->community_strlen == 0) {
 		/* community string was too long or really empty*/
 		snmp_stats.inbadcommunitynames++;
@@ -939,7 +969,8 @@ static int snmp_parse_inbound_frame(struct snmp_request *request)
 		}
 	} else {
 		/* only check valid value, don't touch 'request->error_status', maybe a response
-		 * error status was already set to above; */
+		 * error status was already set to above;
+		 */
 		IF_PARSE_EXEC(snmp_asn1_dec_s32t(&pbuf_stream, tlv.value_len, &s32_value));
 		IF_PARSE_ASSERT(s32_value == SNMP_ERR_NOERROR);
 	}
@@ -1199,7 +1230,8 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 			/* mapping of implementation specific "virtual" error codes
 			 * (during processing of frame we already stored them in error_status field,
 			 * so no need to check all varbinds here for those exceptions as suggested
-			 * by RFC) */
+			 * by RFC)
+			 */
 			case SNMP_ERR_NOSUCHINSTANCE:
 			case SNMP_ERR_NOSUCHOBJECT:
 			case SNMP_ERR_ENDOFMIBVIEW:
@@ -1232,7 +1264,8 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 	} else {
 		if (request->request_type == SNMP_ASN1_CONTEXT_PDU_SET_REQ) {
 			/* map error codes to according to RFC 1905 (4.2.5.  The SetRequest-PDU)
-			 * return 'NotWritable' for unknown OIDs) */
+			 * return 'NotWritable' for unknown OIDs)
+			 */
 			switch (request->error_status) {
 			case SNMP_ERR_NOSUCHINSTANCE:
 			case SNMP_ERR_NOSUCHOBJECT:
@@ -1246,9 +1279,9 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 
 		if (request->error_status >= SNMP_VARBIND_EXCEPTION_OFFSET) {
 			/* should never occur because v2 frames store exceptions directly inside
-			 * varbinds and not as frame error_status */
-			LOG_DBG("snmp_complete_outbound_frame() > Found v2 request with varbind "
-				"exception code stored as error status!\n");
+			 * varbinds and not as frame error_status
+			 */
+			LOG_DBG("v2 request has a varbind exception code as error status");
 			return ERR_ARG;
 		}
 	}
@@ -1256,8 +1289,10 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 	if ((request->error_status != SNMP_ERR_NOERROR) ||
 	    (request->request_type == SNMP_ASN1_CONTEXT_PDU_SET_REQ)) {
 		/* all inbound vars are returned in response without any modification for error
-		 * responses and successful set requests*/
+		 * responses and successful set requests
+		 */
 		struct snmp_pbuf_stream inbound_stream;
+
 		OF_BUILD_EXEC(snmp_pbuf_stream_init(&inbound_stream, request->inbound_buf,
 						    request->inbound_varbind_offset,
 						    request->inbound_varbind_len));
@@ -1272,7 +1307,8 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 	frame_size = request->outbound_pbuf_stream.offset;
 
 	/* complete missing length in 'Message' sequence ; 'Message' tlv is located at the beginning
-	 * (offset 0) */
+	 * (offset 0)
+	 */
 	SNMP_ASN1_SET_TLV_PARAMS(
 		tlv, SNMP_ASN1_TYPE_SEQUENCE, 3,
 		frame_size + outbound_padding - 1 -
@@ -1293,6 +1329,7 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 	/* process and encode final error status */
 	if (request->error_status != 0) {
 		uint16_t len;
+
 		snmp_asn1_enc_s32t_cnt(request->error_status, &len);
 		if (len != 1) {
 			/* error, we only reserved one byte for it */
@@ -1304,7 +1341,8 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 						 request->error_status));
 
 		/* for compatibility to v1, log statistics; in v2 (RFC 1907) these statistics are
-		 * obsoleted */
+		 * obsoleted
+		 */
 		switch (request->error_status) {
 		case SNMP_ERR_TOOBIG:
 			snmp_stats.outtoobigs++;
@@ -1325,7 +1363,8 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 			request->error_index = 0; /* defined by RFC 1157 */
 		} else if (request->error_index == 0) {
 			/* set index to varbind where error occurred (if not already set before,
-			 * e.g. during GetBulk processing) */
+			 * e.g. during GetBulk processing)
+			 */
 			request->error_index = request->inbound_varbind_enumerator.varbind_count;
 		}
 	} else {
@@ -1341,6 +1380,7 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 	/* encode final error index*/
 	if (request->error_index != 0) {
 		uint16_t len;
+
 		snmp_asn1_enc_s32t_cnt(request->error_index, &len);
 		if (len != 1) {
 			/* error, we only reserved one byte for it */
@@ -1353,7 +1393,8 @@ static int snmp_complete_outbound_frame(struct snmp_request *request)
 	}
 
 	/* complete missing length in 'VarBindList' sequence ; 'VarBindList' tlv is located directly
-	 * before varbind offset */
+	 * before varbind offset
+	 */
 	SNMP_ASN1_SET_TLV_PARAMS(tlv, SNMP_ASN1_TYPE_SEQUENCE, 3,
 				 frame_size - request->outbound_varbind_offset);
 	OF_BUILD_EXEC(snmp_pbuf_stream_seek_abs(
@@ -1379,8 +1420,10 @@ static void snmp_execute_write_callbacks(struct snmp_request *request)
 
 	snmp_vb_enumerator_init(&inbound_varbind_enumerator, request->inbound_buf,
 				request->inbound_varbind_offset, request->inbound_varbind_len);
-	vb.object_value = NULL; /* do NOT decode value (we enumerate outbound buffer here, so all
-				   varbinds have values assigned, which we don't need here) */
+	/* do NOT decode the value: this enumerates the outbound buffer, so every
+	 * varbind already has a value assigned, which is not needed here.
+	 */
+	vb.object_value = NULL;
 
 	while (snmp_vb_enumerator_get_next(&inbound_varbind_enumerator, &vb) ==
 	       SNMP_VB_ENUMERATOR_ERR_OK) {

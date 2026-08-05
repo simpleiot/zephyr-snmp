@@ -129,12 +129,12 @@ extern "C" {
 typedef enum {
 	SNMP_ERR_NOERROR = 0,
 	/*
-	outdated v1 error codes. do not use anmore!
-	#define SNMP_ERR_NOSUCHNAME 2  use SNMP_ERR_NOSUCHINSTANCE instead
-	#define SNMP_ERR_BADVALUE   3  use
-	SNMP_ERR_WRONGTYPE,SNMP_ERR_WRONGLENGTH,SNMP_ERR_WRONGENCODING or SNMP_ERR_WRONGVALUE
-	instead #define SNMP_ERR_READONLY   4  use SNMP_ERR_NOTWRITABLE instead
-	*/
+	 * outdated v1 error codes. do not use anmore!
+	 * #define SNMP_ERR_NOSUCHNAME 2  use SNMP_ERR_NOSUCHINSTANCE instead
+	 * #define SNMP_ERR_BADVALUE   3  use
+	 * SNMP_ERR_WRONGTYPE,SNMP_ERR_WRONGLENGTH,SNMP_ERR_WRONGENCODING or SNMP_ERR_WRONGVALUE
+	 * instead #define SNMP_ERR_READONLY   4  use SNMP_ERR_NOTWRITABLE instead
+	 */
 	SNMP_ERR_GENERROR = 5,
 	SNMP_ERR_NOACCESS = 6,
 	SNMP_ERR_WRONGTYPE = 7,
@@ -179,11 +179,11 @@ union snmp_variant_value {
 };
 
 /**
-SNMP MIB node types
- tree node is the only node the stack can process in order to walk the tree,
- all other nodes are assumed to be leaf nodes.
- This cannot be an enum because users may want to define their own node types.
-*/
+ * SNMP MIB node types
+ * tree node is the only node the stack can process in order to walk the tree,
+ * all other nodes are assumed to be leaf nodes.
+ * This cannot be an enum because users may want to define their own node types.
+ */
 #define SNMP_NODE_TREE         0x00
 /* predefined leaf node types */
 #define SNMP_NODE_SCALAR       0x01
@@ -217,19 +217,22 @@ typedef snmp_err_t (*node_instance_set_test_method)(struct snmp_node_instance *,
 typedef snmp_err_t (*node_instance_set_value_method)(struct snmp_node_instance *, uint16_t, void *);
 typedef void (*node_instance_release_method)(struct snmp_node_instance *);
 
-#define SNMP_GET_VALUE_RAW_DATA                                                                    \
-	0x4000 /* do not use 0x8000 because return value of node_instance_get_value_method is      \
-		  signed16 and 0x8000 would be the signed bit */
+/* Not 0x8000: the return value of node_instance_get_value_method is a signed
+ * 16-bit value, where 0x8000 would be the sign bit.
+ */
+#define SNMP_GET_VALUE_RAW_DATA 0x4000
 
 /** SNMP node instance */
 struct snmp_node_instance {
 	/** prefilled with the node, get_instance() is called on; may be changed by user to any
 	 * value to pass an arbitrary node between calls to get_instance() and
-	 * get_value/test_value/set_value */
+	 * get_value/test_value/set_value
+	 */
 	const struct snmp_node *node;
 	/** prefilled with the instance id requested; for get_instance() this is the exact oid
 	 * requested; for get_next_instance() this is the relative starting point, stack expects
-	 * relative oid of next node here */
+	 * relative oid of next node here
+	 */
 	struct snmp_obj_id instance_oid;
 
 	/** ASN type for this object (see snmp_asn1.h for definitions) */
@@ -238,21 +241,25 @@ struct snmp_node_instance {
 	snmp_access_t access;
 
 	/** returns object value for the given object identifier. Return values <0 to indicate an
-	 * error */
+	 * error
+	 */
 	node_instance_get_value_method get_value;
 	/** tests length and/or range BEFORE setting */
 	node_instance_set_test_method set_test;
 	/** sets object value, only called when set_test() was successful */
 	node_instance_set_value_method set_value;
 	/** called in any case when the instance is not required anymore by stack (useful for
-	 * freeing memory allocated in get_instance/get_next_instance methods) */
+	 * freeing memory allocated in get_instance/get_next_instance methods)
+	 */
 	node_instance_release_method release_instance;
 
 	/** reference to pass arbitrary value between calls to get_instance() and
-	 * get_value/test_value/set_value */
+	 * get_value/test_value/set_value
+	 */
 	union snmp_variant_value reference;
 	/** see reference (if reference is a pointer, the length of underlying data may be stored
-	 * here or anything else) */
+	 * here or anything else)
+	 */
 	uint32_t reference_len;
 };
 

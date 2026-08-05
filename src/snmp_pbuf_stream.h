@@ -50,7 +50,8 @@ extern "C" {
 #endif
 
 /** A cursor over a flat buffer: @a offset is the position from @a data,
- *  @a length the number of bytes still reachable from there. */
+ *  @a length the number of bytes still reachable from there.
+ */
 struct snmp_pbuf_stream {
 	uint8_t *data;
 	uint16_t offset;

@@ -91,9 +91,10 @@ snmp_err_t snmp_table_get_next_instance(const uint32_t *root_oid, uint8_t root_o
 	 (set_test_method),                                                                        \
 	 (set_value_method)}
 
-#define SNMP_TABLE_GET_COLUMN_FROM_OID(oid)                                                        \
-	((oid)[1]) /* first array value is (fixed) row entry (fixed to 1) and 2nd value is column, \
-		      follow3ed by instance */
+/* The first array value is the (fixed) row entry, the second is the column,
+ * followed by the instance.
+ */
+#define SNMP_TABLE_GET_COLUMN_FROM_OID(oid) ((oid)[1])
 
 /** simple read-only table */
 typedef enum {
@@ -106,8 +107,8 @@ typedef enum {
 struct snmp_table_simple_col_def {
 	uint32_t index;
 	uint8_t asn1_type;
-	snmp_table_column_data_type_t
-		data_type; /* depending of what union member is used to store the value*/
+	/* selects the union member used to store the value */
+	snmp_table_column_data_type_t data_type;
 };
 
 /** simple read-only table node */
