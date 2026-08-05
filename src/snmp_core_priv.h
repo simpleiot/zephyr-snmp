@@ -44,8 +44,12 @@
 extern "C" {
 #endif
 
+#include "snmp_lock.h"
+
+/** Catch agent state reached without the lock the port layer serializes on. */
 #if !defined LWIP_ASSERT_SNMP_LOCKED
-#define LWIP_ASSERT_SNMP_LOCKED()
+#define LWIP_ASSERT_SNMP_LOCKED() \
+	__ASSERT(snmp_agent_lock_held(), "SNMP agent state touched without the lock")
 #endif
 
 /* (outdated) SNMPv1 error codes

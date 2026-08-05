@@ -37,6 +37,7 @@
  */
 
 #include "lwip/apps/snmp_opts.h"
+#include "snmp_lock.h"
 
 LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 
@@ -144,10 +145,11 @@ static s32_t req_id = 1;
 void
 snmp_trap_dst_enable(u8_t dst_idx, u8_t enable)
 {
-  LWIP_ASSERT_SNMP_LOCKED();
+  snmp_agent_lock();
   if (dst_idx < SNMP_TRAP_DESTINATIONS) {
     trap_dst[dst_idx].enable = enable;
   }
+  snmp_agent_unlock();
 }
 
 /**
@@ -161,10 +163,11 @@ snmp_trap_dst_enable(u8_t dst_idx, u8_t enable)
 void
 snmp_trap_dst_ip_set(u8_t dst_idx, const ip_addr_t *dst)
 {
-  LWIP_ASSERT_SNMP_LOCKED();
+  snmp_agent_lock();
   if (dst_idx < SNMP_TRAP_DESTINATIONS) {
     ip_addr_set(&trap_dst[dst_idx].dip, dst);
   }
+  snmp_agent_unlock();
 }
 
 /**
@@ -178,7 +181,9 @@ snmp_trap_dst_ip_set(u8_t dst_idx, const ip_addr_t *dst)
 void
 snmp_set_auth_traps_enabled(u8_t enable)
 {
+  snmp_agent_lock();
   snmp_auth_traps_enabled = enable;
+  snmp_agent_unlock();
 }
 
 /**
@@ -190,7 +195,13 @@ snmp_set_auth_traps_enabled(u8_t enable)
 u8_t
 snmp_get_auth_traps_enabled(void)
 {
-  return snmp_auth_traps_enabled;
+  u8_t enabled;
+
+  snmp_agent_lock();
+  enabled = snmp_auth_traps_enabled;
+  snmp_agent_unlock();
+
+  return enabled;
 }
 
 /**
@@ -207,7 +218,9 @@ snmp_get_auth_traps_enabled(void)
 void
 snmp_set_default_trap_version(u8_t snmp_version)
 {
+  snmp_agent_lock();
   snmp_default_trap_version = snmp_version;
+  snmp_agent_unlock();
 }
 
 /**
@@ -222,7 +235,13 @@ snmp_set_default_trap_version(u8_t snmp_version)
 u8_t
 snmp_get_default_trap_version(void)
 {
-  return snmp_default_trap_version;
+  u8_t version;
+
+  snmp_agent_lock();
+  version = snmp_default_trap_version;
+  snmp_agent_unlock();
+
+  return version;
 }
 
 /**
@@ -266,6 +285,8 @@ snmp_prepare_trap_oid(struct snmp_obj_id *dest_snmp_trap_oid, const struct snmp_
   } else {
     err = ERR_VAL;
   }
+  snmp_agent_unlock();
+
   return err;
 }
 
@@ -322,7 +343,7 @@ snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16
     snmp_stats.outpkts++;
 
     /* snmp_sendto() wants a network-endian port number. */
-    u16_t port = ntohs(CONFIG_SNMP_AGENT_TRAP_PORT);
+    u16_t port = net_htons(CONFIG_SNMP_AGENT_TRAP_PORT);
     /** send to the TRAP destination */
     rc = snmp_sendto(snmp_traps_handle, p, dip, port);
     if (rc <= 0) {
@@ -466,9 +487,15 @@ err_t
 snmp_send_trap(const struct snmp_obj_id* oid, s32_t generic_trap, s32_t specific_trap, struct snmp_varbind *varbinds)
 {
   struct snmp_msg_trap trap_msg = {0};
+  err_t err;
+
+  snmp_agent_lock();
   trap_msg.snmp_version = snmp_default_trap_version;
   trap_msg.trap_or_inform = SNMP_IS_TRAP;
-  return snmp_send_trap_or_notification_or_inform_generic(&trap_msg, oid, generic_trap, specific_trap, varbinds);
+  err = snmp_send_trap_or_notification_or_inform_generic(&trap_msg, oid, generic_trap, specific_trap, varbinds);
+  snmp_agent_unlock();
+
+  return err;
 }
 
 /**
@@ -482,6 +509,8 @@ snmp_send_trap_generic(s32_t generic_trap)
 {
   err_t err = ERR_OK;
   struct snmp_msg_trap trap_msg = {0};
+
+  snmp_agent_lock();
   trap_msg.snmp_version = snmp_default_trap_version;
   trap_msg.trap_or_inform = SNMP_IS_TRAP;
 
@@ -507,9 +536,15 @@ err_t
 snmp_send_trap_specific(s32_t specific_trap, struct snmp_varbind *varbinds)
 {
   struct snmp_msg_trap trap_msg = {0};
+  err_t err;
+
+  snmp_agent_lock();
   trap_msg.snmp_version = snmp_default_trap_version;
   trap_msg.trap_or_inform = SNMP_IS_TRAP;
-  return snmp_send_trap_or_notification_or_inform_generic(&trap_msg, NULL, SNMP_GENTRAP_ENTERPRISE_SPECIFIC, specific_trap, varbinds);
+  err = snmp_send_trap_or_notification_or_inform_generic(&trap_msg, NULL, SNMP_GENTRAP_ENTERPRISE_SPECIFIC, specific_trap, varbinds);
+  snmp_agent_unlock();
+
+  return err;
 }
 
 /**
@@ -531,9 +566,11 @@ snmp_coldstart_trap(void)
 void
 snmp_authfail_trap(void)
 {
+  snmp_agent_lock();
   if (snmp_auth_traps_enabled != 0) {
     snmp_send_trap_generic(SNMP_GENTRAP_AUTH_FAILURE);
   }
+  snmp_agent_unlock();
 }
 
 /**
@@ -908,10 +945,16 @@ err_t
 snmp_send_inform(const struct snmp_obj_id* oid, s32_t generic_trap, s32_t specific_trap, struct snmp_varbind *varbinds, s32_t *ptr_request_id)
 {
   struct snmp_msg_trap trap_msg = {0};
+  err_t err;
+
+  snmp_agent_lock();
   trap_msg.snmp_version = SNMP_VERSION_2c;
   trap_msg.trap_or_inform = SNMP_IS_INFORM;
   *ptr_request_id = req_id;
-  return snmp_send_trap_or_notification_or_inform_generic(&trap_msg, oid, generic_trap, specific_trap, varbinds);
+  err = snmp_send_trap_or_notification_or_inform_generic(&trap_msg, oid, generic_trap, specific_trap, varbinds);
+  snmp_agent_unlock();
+
+  return err;
 }
 
 #endif /* LWIP_SNMP */

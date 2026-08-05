@@ -7,6 +7,7 @@
 #include "lwip/apps/snmp_scalar.h"
 #include "lwip/apps/snmp_core.h"
 #include "lwip/apps/snmp_callback.h"
+#include "snmp_lock.h"
 
 LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 
@@ -35,6 +36,7 @@ static int match_length(const char *complete, const char *partial)
 
 void install_snmp_handler(struct snmp_handler_entry * new_entry)
 {
+	snmp_agent_lock();
 	new_entry->next = NULL;
 	if (first_handler == NULL) {
 		first_handler = new_entry;
@@ -49,6 +51,7 @@ void install_snmp_handler(struct snmp_handler_entry * new_entry)
 			current = current->next;
 		}
 	}
+	snmp_agent_unlock();
 }
 
 

@@ -33,6 +33,32 @@ and this project adheres to
 - give `print_oid()` a caller-supplied buffer, as `snmp_oid_to_str()`; the
   shared static buffer it used before returned the same storage when a single
   log statement rendered two OIDs
+- process requests in the socket service callback instead of handing packet
+  ids to an application thread. `snmp_zephyr_init()`, `snmp_recv_packet()`,
+  and the `recv_packet_handler` contract are replaced by
+  `net_snmp_agent_start()` and `net_snmp_agent_stop()`, which return 0 or a
+  negative errno. Applications no longer supply a thread, a message queue, or
+  a callback
+- fix a race in the receive path: two static slots were filled by the socket
+  service thread with no synchronization, so a burst of datagrams could
+  overwrite a slot the application thread was still reading
+- serialize agent state with a mutex taken by the socket service callback and
+  by every public entry point, which removes the "call everything from one
+  thread" rule
+- rename `snmp_prepare_trap_test()` to `net_snmp_agent_trap_dst_set()`, which
+  now parses the address and reports a failure to
+- bind a single IPv4 socket on port 161 and send traps from it. The port 162
+  socket is gone; an agent needs 162 only to receive, which is the manager's
+  role
+- fix the socket setup, which created an `AF_INET` socket but filled in a
+  `struct sockaddr_in6`, bound with the IPv6 length, and queried
+  `IPV6_V6ONLY` on it
+- fix `lwip_htons()` and friends, which expanded to identity macros: the
+  `#if BYTE_ORDER == BIG_ENDIAN` test compared two undefined names, so it was
+  always true. They now use Zephyr's `net_htons()` family
+- drop the dependency on `CONFIG_POSIX_API` by using the namespaced
+  networking API throughout, and the `VERSION` file requirement by dropping
+  an `<app_version.h>` include that nothing used
 
 ## [v0.0.6] - 2025-05-08
 

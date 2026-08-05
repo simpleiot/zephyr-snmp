@@ -42,6 +42,7 @@
 #include "lwip/sys.h"
 
 #include <string.h>
+#include "snmp_lock.h"
 
 LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 
@@ -91,10 +92,12 @@ static u16_t        syslocation_bufsize       = 0;    /* 0=not writable */
 void
 snmp_mib2_set_sysdescr(const u8_t *str, const u16_t *len)
 {
+  snmp_agent_lock();
   if (str != NULL) {
     sysdescr     = str;
     sysdescr_len = len;
   }
+  snmp_agent_unlock();
 }
 
 /**
@@ -113,6 +116,7 @@ snmp_mib2_set_sysdescr(const u8_t *str, const u16_t *len)
 void
 snmp_mib2_set_syscontact(u8_t *ocstr, u16_t *ocstrlen, u16_t bufsize)
 {
+  snmp_agent_lock();
   if (ocstr != NULL) {
     syscontact         = ocstr;
     syscontact_wr      = ocstr;
@@ -120,6 +124,7 @@ snmp_mib2_set_syscontact(u8_t *ocstr, u16_t *ocstrlen, u16_t bufsize)
     syscontact_wr_len  = ocstrlen;
     syscontact_bufsize = bufsize;
   }
+  snmp_agent_unlock();
 }
 
 /**
@@ -129,6 +134,7 @@ snmp_mib2_set_syscontact(u8_t *ocstr, u16_t *ocstrlen, u16_t bufsize)
 void
 snmp_mib2_set_syscontact_readonly(const u8_t *ocstr, const u16_t *ocstrlen)
 {
+  snmp_agent_lock();
   if (ocstr != NULL) {
     syscontact         = ocstr;
     syscontact_len     = ocstrlen;
@@ -136,6 +142,7 @@ snmp_mib2_set_syscontact_readonly(const u8_t *ocstr, const u16_t *ocstrlen)
     syscontact_wr_len  = NULL;
     syscontact_bufsize = 0;
   }
+  snmp_agent_unlock();
 }
 
 
@@ -155,6 +162,7 @@ snmp_mib2_set_syscontact_readonly(const u8_t *ocstr, const u16_t *ocstrlen)
 void
 snmp_mib2_set_sysname(u8_t *ocstr, u16_t *ocstrlen, u16_t bufsize)
 {
+  snmp_agent_lock();
   if (ocstr != NULL) {
     sysname         = ocstr;
     sysname_wr      = ocstr;
@@ -162,6 +170,7 @@ snmp_mib2_set_sysname(u8_t *ocstr, u16_t *ocstrlen, u16_t bufsize)
     sysname_wr_len  = ocstrlen;
     sysname_bufsize = bufsize;
   }
+  snmp_agent_unlock();
 }
 
 /**
@@ -171,6 +180,7 @@ snmp_mib2_set_sysname(u8_t *ocstr, u16_t *ocstrlen, u16_t bufsize)
 void
 snmp_mib2_set_sysname_readonly(const u8_t *ocstr, const u16_t *ocstrlen)
 {
+  snmp_agent_lock();
   if (ocstr != NULL) {
     sysname         = ocstr;
     sysname_len     = ocstrlen;
@@ -178,6 +188,7 @@ snmp_mib2_set_sysname_readonly(const u8_t *ocstr, const u16_t *ocstrlen)
     sysname_wr_len  = NULL;
     sysname_bufsize = 0;
   }
+  snmp_agent_unlock();
 }
 
 /**
@@ -196,6 +207,7 @@ snmp_mib2_set_sysname_readonly(const u8_t *ocstr, const u16_t *ocstrlen)
 void
 snmp_mib2_set_syslocation(u8_t *ocstr, u16_t *ocstrlen, u16_t bufsize)
 {
+  snmp_agent_lock();
   if (ocstr != NULL) {
     syslocation         = ocstr;
     syslocation_wr      = ocstr;
@@ -203,6 +215,7 @@ snmp_mib2_set_syslocation(u8_t *ocstr, u16_t *ocstrlen, u16_t bufsize)
     syslocation_wr_len  = ocstrlen;
     syslocation_bufsize = bufsize;
   }
+  snmp_agent_unlock();
 }
 
 /**
@@ -212,6 +225,7 @@ snmp_mib2_set_syslocation(u8_t *ocstr, u16_t *ocstrlen, u16_t bufsize)
 void
 snmp_mib2_set_syslocation_readonly(const u8_t *ocstr, const u16_t *ocstrlen)
 {
+  snmp_agent_lock();
   if (ocstr != NULL) {
     syslocation         = ocstr;
     syslocation_len     = ocstrlen;
@@ -219,9 +233,10 @@ snmp_mib2_set_syslocation_readonly(const u8_t *ocstr, const u16_t *ocstrlen)
     syslocation_wr_len  = NULL;
     syslocation_bufsize = 0;
   }
+  snmp_agent_unlock();
 }
 
-const char *oid_names[] = {
+static const char *const oid_names[] = {
     "oidNull",
     "sysDescr",
     "sysObjectID",

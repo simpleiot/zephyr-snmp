@@ -1,10 +1,9 @@
 # SNMP agent sample
 
 A minimal application that starts the SNMP agent, sets the MIB-2 system
-group fields, and serves requests on UDP port 161. It follows the usage
-documented in the top-level README: a socket-service callback forwards
-packet ids to a single application thread that owns every call into the
-library.
+group fields, and serves requests on UDP port 161. The agent runs on
+Zephyr's shared socket service thread, so the application only has to start
+it and describe the device.
 
 ## Building
 

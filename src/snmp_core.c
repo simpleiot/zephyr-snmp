@@ -183,6 +183,7 @@
 
 #include "lwip/def.h"
 #include "lwip/apps/snmp_opts.h"
+#include "snmp_lock.h"
 
 LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 
@@ -238,11 +239,12 @@ static struct snmp_mib const *const *snmp_mibs = default_mibs;
 void
 snmp_set_mibs(const struct snmp_mib **mibs, u8_t num_mibs)
 {
-  LWIP_ASSERT_SNMP_LOCKED();
   LWIP_ASSERT("mibs pointer must be != NULL", (mibs != NULL));
   LWIP_ASSERT("num_mibs pointer must be != 0", (num_mibs != 0));
+  snmp_agent_lock();
   snmp_mibs     = mibs;
   snmp_num_mibs = num_mibs;
+  snmp_agent_unlock();
 }
 
 /**
@@ -261,12 +263,13 @@ snmp_set_mibs(const struct snmp_mib **mibs, u8_t num_mibs)
  */
 void snmp_set_device_enterprise_oid(const struct snmp_obj_id *device_enterprise_oid)
 {
-  LWIP_ASSERT_SNMP_LOCKED();
+  snmp_agent_lock();
   if (device_enterprise_oid == NULL) {
     snmp_device_enterprise_oid = &snmp_device_enterprise_oid_default;
   } else {
     snmp_device_enterprise_oid = device_enterprise_oid;
   }
+  snmp_agent_unlock();
 }
 
 /**
@@ -275,8 +278,13 @@ void snmp_set_device_enterprise_oid(const struct snmp_obj_id *device_enterprise_
  */
 const struct snmp_obj_id *snmp_get_device_enterprise_oid(void)
 {
-  LWIP_ASSERT_SNMP_LOCKED();
-  return snmp_device_enterprise_oid;
+  const struct snmp_obj_id *oid;
+
+  snmp_agent_lock();
+  oid = snmp_device_enterprise_oid;
+  snmp_agent_unlock();
+
+  return oid;
 }
 
 #if LWIP_IPV4

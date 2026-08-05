@@ -1,6 +1,6 @@
 /**
  * @file
- * SNMP zephyr frontend.
+ * Zephyr frontend for the SNMP agent.
  */
 
 /*
@@ -30,381 +30,350 @@
  * OF SUCH DAMAGE.
  *
  * Author: Dirk Ziegelmeier <dziegel@gmx.de>
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
-#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 
-#include <zephyr/net/socket.h>
 #include <zephyr/kernel.h>
-
-#include <arpa/inet.h>
-#include <sys/select.h>
-#include <sys/time.h>
-#include <fcntl.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/net/net_if.h>
+#include <zephyr/net/net_ip.h>
+#include <zephyr/net/socket.h>
 #include <zephyr/net/socket_service.h>
-#include <app_version.h>
 
 #include <lwip/apps/snmp_opts.h>
 #include <lwip/apps/snmp_zephyr.h>
 
+#include "lwip/ip.h"
+#include "lwip/sys.h"
+#include "lwip/udp.h"
+#include "snmp_lock.h"
+#include "snmp_msg.h"
 
-	#include "lwip/ip.h"
-	#include "lwip/udp.h"
-	#include "snmp_msg.h"
-	#include "lwip/sys.h"
-	#include "lwip/prot/iana.h"
+LOG_MODULE_REGISTER(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 
-	LOG_MODULE_REGISTER(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
+/* The agent core keeps its state in file-scope variables and does no locking
+ * of its own. Requests arrive on the socket service thread while applications
+ * configure the agent and send traps from their own threads, so every path
+ * into that state takes this mutex. Zephyr mutexes are recursive, which
+ * matters because an entry point may hold it while the core calls back into
+ * another one.
+ */
+static K_MUTEX_DEFINE(agent_lock);
 
-	typedef struct
-	{
-		int socket_161;  /* SNMP/serv socket */
-		int socket_162;  /* SNMP/trap socket */
-	} socket_set_t;
+/** The socket requests arrive on, and traps are sent from. */
+static int agent_sock = -1;
 
-	/* The collection of sockets in use. */
-	static socket_set_t socket_set;
+/** Guarded by agent_lock, so one buffer serves every request. */
+static uint8_t recv_buf[CONFIG_SNMP_AGENT_MAX_MSG_SIZE];
 
-	typedef struct {
-		char buf[CONFIG_SNMP_AGENT_MAX_MSG_SIZE];
-		ssize_t len;
-		int fd;
-		struct sockaddr addr;
-	} SRecvPacket;
+static struct zsock_pollfd agent_fds[1] = { { .fd = -1 } };
 
-	static SRecvPacket recvPackets[2];
+void snmp_agent_lock(void)
+{
+	k_mutex_lock(&agent_lock, K_FOREVER);
+}
 
-	const ip_addr_t ip_addr_any;
+void snmp_agent_unlock(void)
+{
+	k_mutex_unlock(&agent_lock);
+}
 
-/** udp_pcbs export for external reference (e.g. SNMP agent) */
-/** Yes, a global variable. */
-	struct udp_pcb * udp_pcbs;
-
-/** Global variable containing lwIP internal statistics. Add this to your debugger's watchlist. */
-	struct stats_ lwip_stats;
-
-/** Global variable containing the list of network interfaces. */
-	struct netif * netif_list;
-
-/** The default network interface. */
-	struct netif * netif_default;
-
-/** 'has_sockets' is true when all UD sockets are created. */
-	static bool has_sockets = 0;
-
-/** The address of a user function, which will be called when a UDP packet
- * is received. */
-	static recv_packet_handler user_recv_packet_handler;
-
-	static int create_socket(unsigned port)
-	{
-		int socket_fd = -1;
-		int opt;
-		int ret;
-		socklen_t optlen = sizeof( int );
-
-		struct sockaddr_in6 bind_addr =
-		{
-			.sin6_family = AF_INET,
-			.sin6_addr   = IN6ADDR_ANY_INIT,
-			.sin6_port   = htons( port ),
-		};
-
-		socket_fd = zsock_socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
-
-		if( socket_fd < 0 )
-		{
-			LOG_ERR("create_socket: socket() failed: %d, errno %d", socket_fd, errno);
-		}
-		else
-		{
-			LOG_DBG("create_socket: socket %d for %s", socket_fd,
-				(port == CONFIG_SNMP_AGENT_TRAP_PORT) ? "traps" : "requests");
-
-			ret = zsock_getsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, &optlen );
-
-			if (ret == 0 && opt != 0)
-			{
-				LOG_DBG("create_socket: turning off IPV6_V6ONLY");
-
-				opt = 0;
-				ret = zsock_setsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY,
-								  &opt, optlen );
-
-				if( ret < 0 )
-				{
-					LOG_WRN("create_socket: cannot turn off IPV6_V6ONLY");
-				}
-			}
-
-			struct timeval tv;
-			tv.tv_sec = 0;
-			tv.tv_usec = 1000;
-			int rc = zsock_setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
-			LOG_DBG("create_socket: setsockopt(SO_RCVTIMEO) returned %d", rc);
-
-			if( zsock_bind( socket_fd, ( struct sockaddr * ) &bind_addr, sizeof( bind_addr ) ) < 0 )
-			{
-				LOG_ERR("create_socket: bind to port %u failed, errno %d", port, errno);
-			}
-		}
-		return socket_fd;
-	}
-
-	void snmp_prepare_trap_test(const char * ip_address)
-	{
-		/** Initiate a trap for testing. */
-		/// Setting version to use for testing.
-		snmp_set_default_trap_version(SNMP_VERSION_2c);
-
-		ip_addr_t dst;
-		struct in_addr in_addr;
-		dst.addr = inet_addr(ip_address);
-		
-		in_addr.s_addr = dst.addr;
-		
-		snmp_trap_dst_enable(0, true);
-		snmp_trap_dst_ip_set(0, &dst);
-	}
-
-	/**
-	 * @brief handle_snmp_packet() : an internal function that copies a
-	 *        UDP payload to a pbuf, in order to be analysed by the
-	 *        SNMP library. */
-	static void handle_snmp_packet(int packet_id)
-	{
-		SRecvPacket * recv = &recvPackets[packet_id];
-		struct pbuf * pbuf = pbuf_alloc( PBUF_TRANSPORT, recv->len, PBUF_RAM );
-		if( pbuf != NULL )
-		{
-			struct sockaddr_in * sin = (struct sockaddr_in *) &recv->addr;
-			pbuf->next = NULL;
-			memcpy (pbuf->payload, recv->buf, recv->len);
-			pbuf->tot_len = recv->len;
-			pbuf->len = recv->len;
-			pbuf->ref = 1;
-
-			ip_addr_t from_address;
-			from_address.addr = sin->sin_addr.s_addr;
-			/* Here a socket is cast to a void pointer because lwIP needs it a void*.
-			 * If the library wants to send a reply, snmp_sendto() will be called. */
-			snmp_receive( (void*) recv->fd, pbuf, &from_address, sin->sin_port);
-			pbuf_free (pbuf);
-		}
-	}
-
-	/**
-	 * @brief snmp_recv_packet(): The SNMP server thread will call this
-	 *        function after it "received packet handler" was called.
-	 *        'packet_id' identifies the packet number.
-	 */
-
-	void snmp_recv_packet(int packet_id)
-	{
-		if (!has_sockets) {
-			/* Sockets are not (yet) created, so we shouldn't get here. */
-			k_sleep(K_MSEC(200));
-			return;
-		}
-		/* A sanity check on 'packet_id' */
-		if ((packet_id >= 0) && (packet_id < (int)ARRAY_SIZE(recvPackets))) {
-			SRecvPacket * recv = &recvPackets[packet_id];
-			ssize_t len = recv->len;
-			if (len > 0) {
-				struct sockaddr client_addr;
-				struct sockaddr_in * sin = (struct sockaddr_in *) &client_addr;
-				memcpy (&client_addr, &recv->addr, sizeof client_addr);
-			
-				int port = (recv->fd == socket_set.socket_161) ?
-					CONFIG_SNMP_AGENT_PORT : CONFIG_SNMP_AGENT_TRAP_PORT;
-				LOG_DBG("recv[%u]: %d bytes from %s:%u", port, (int)len,
-					inet_ntoa(sin->sin_addr), ntohs(sin->sin_port));
-
-				handle_snmp_packet(packet_id);
-
-				recvPackets[packet_id].len = 0;
-			} /* if (recvPackets[0].len > 0) */
-		} else {
-			LOG_WRN("snmp_recv_packet: invalid packet_id %d", packet_id);
-		}
-	}
+bool snmp_agent_lock_held(void)
+{
+	return agent_lock.owner == k_current_get();
+}
 
 /**
- * @brief Create sockets, starts SNMP Agent.
+ * @brief Hand one received datagram to the agent core.
+ *
+ * Runs with agent_lock held.
  */
-#define MAX_SERVICES 2
-static void udp_service_handler(struct net_socket_service_event *pev);
-NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERVICES);
+static void snmp_process_datagram(int sock, const uint8_t *data, size_t len,
+				  const struct net_sockaddr_in *from)
+{
+	struct pbuf *p;
+	ip_addr_t from_address;
 
-	/* @brief udp_service_handler() is a callback function for the 
-	 * Zephyr socket service. It will be called from a special thread.
-	 */
-	static void udp_service_handler(struct net_socket_service_event *pev)
-	{
-		static int packet_id = 0;
-		SRecvPacket * recv = &recvPackets[packet_id];
-		struct zsock_pollfd *pfd = &pev->event;
-		socklen_t addrlen = sizeof(recv->addr);
-		ssize_t len;
-		/* It looks like we *have to* read the received data.
-		 * We'll pass it on to the application. */
-		len = zsock_recvfrom(pfd->fd,
-							 recv->buf,
-							 sizeof(recv->buf),
-							 0, // ZSOCK_MSG_DONTWAIT,
-							 (struct sockaddr *)&recv->addr,
-							 &addrlen);
-		if (len > 0) {
-			recv->len = len;
-			recv->fd = pfd->fd;
-		/* A UDP packet has been received, pass it to the user's SNMP thread,
-		 * which will call 'snmp_recv_packet(packet_id)'. */
-			if (user_recv_packet_handler != NULL) {
-				user_recv_packet_handler(packet_id);
-			}
-			/* Just in case, put a new buffer available. */
-			if (++packet_id >= (int)ARRAY_SIZE(recvPackets)) {
-				packet_id = 0;
-			}
-			recvPackets[packet_id].len = 0;
-		}
+	p = pbuf_alloc(PBUF_TRANSPORT, len, PBUF_RAM);
+	if (p == NULL) {
+		LOG_ERR("cannot allocate a %zu byte request buffer", len);
+		return;
 	}
+
+	p->next = NULL;
+	memcpy(p->payload, data, len);
+	p->tot_len = len;
+	p->len = len;
+	p->ref = 1;
+
+	from_address.addr = from->sin_addr.s_addr;
+
+	/* The socket is passed as an opaque handle because that is what the
+	 * agent core hands back to snmp_sendto() when it wants to reply. */
+	snmp_receive((void *)(intptr_t)sock, p, &from_address, from->sin_port);
+
+	pbuf_free(p);
+}
 
 /**
- * @brief Create sockets, starts SNMP Agent.
+ * @brief Socket service callback, run on Zephyr's shared service thread.
+ *
+ * Requests are parsed and answered here rather than being queued for an
+ * application thread. Handling is short and bounded, and doing it in place
+ * removes the buffer hand-off that used to sit between the two.
  */
-	int snmp_zephyr_init(recv_packet_handler user_function)
-	{
-		static int has_created = false;
+static void snmp_service_cb(struct net_socket_service_event *evt)
+{
+	struct net_sockaddr_in from;
+	socklen_t fromlen = sizeof(from);
+	int ret;
 
-		user_recv_packet_handler = user_function;
-		if (has_created == false) {
-			has_created = true;
+	if (evt->event.revents & ZSOCK_POLLERR) {
+		LOG_ERR("socket poll error, stopping the agent");
+		(void)net_snmp_agent_stop();
+		return;
+	}
 
-			/* Create the sockets. */
-			socket_set.socket_161 = create_socket(CONFIG_SNMP_AGENT_PORT);
-			socket_set.socket_162 = create_socket(CONFIG_SNMP_AGENT_TRAP_PORT);
+	if (!(evt->event.revents & ZSOCK_POLLIN)) {
+		return;
+	}
 
-			/* The lwIP SNMP driver owns a socket for traps 'snmp_traps_handle'. */
-			snmp_traps_handle = ( void * ) socket_set.socket_162;
+	snmp_agent_lock();
 
-			has_sockets =
-				(socket_set.socket_161 >= 0) &&
-				(socket_set.socket_162 >= 0);
-			if (has_sockets == 0) {
-				/* We're not going to run with just 1 socket. */
-				if (socket_set.socket_161 >= 0) {
-					zsock_close(socket_set.socket_161);
-					socket_set.socket_161 = -1;
-				}
-				if (socket_set.socket_162 >= 0) {
-					zsock_close(socket_set.socket_162);
-					socket_set.socket_162 = -1;
-				}
-			} else {
-				static struct zsock_pollfd fds[2];
+	if (evt->event.fd != agent_sock) {
+		/* The agent stopped between the poll and this callback. */
+		goto unlock;
+	}
 
-				// Configure pollfd for UDP socket 161
-				fds[0].fd = socket_set.socket_161;
-				fds[0].events = ZSOCK_POLLIN;
-
-				// Configure pollfd for UDP socket 162
-				fds[1].fd = socket_set.socket_162;
-				fds[1].events = ZSOCK_POLLIN;
-
-				int ret = net_socket_service_register(&service_udp, fds,
-								      ARRAY_SIZE(fds), NULL);
-
-				if (ret < 0) {
-					LOG_ERR("net_socket_service_register failed: %d", ret);
-				}
-			}
+	ret = zsock_recvfrom(evt->event.fd, recv_buf, sizeof(recv_buf),
+			     ZSOCK_MSG_DONTWAIT,
+			     (struct net_sockaddr *)&from, &fromlen);
+	if (ret < 0) {
+		if (errno != EAGAIN) {
+			LOG_ERR("recvfrom failed, errno %d", errno);
 		}
-		return has_sockets;
+		goto unlock;
 	}
 
-	/* send a UDP packet to the LAN using a network-endian
-	 * port number and IP-address. */
-	err_t snmp_sendto( void * handle,
-					   struct pbuf * p,
-					   const ip_addr_t * dst,
-					   u16_t port )
-	{
-		int rc; /* Store the result of sendto(). */
-		struct sockaddr client_addr;
-		struct sockaddr_in * client_addr_in = (struct sockaddr_in *) &client_addr;
-		socklen_t client_addr_len = sizeof(client_addr);
-
-		client_addr_in->sin_addr.s_addr = dst->addr;
-		client_addr_in->sin_port = port;
-		client_addr_in->sin_family = AF_INET;
-		// snmp_sendto: hnd = 8 port = 162, IP=C0A80213, len = 65
-
-		rc = zsock_sendto ((int) handle, p->payload, p->len, 0, &client_addr, client_addr_len);
-
-		return rc;
+	if (ret == 0) {
+		goto unlock;
 	}
 
-	u8_t snmp_get_local_ip_for_dst( void * handle,
-									const ip_addr_t * dst,
-									ip_addr_t * result )
-	{
-		const ip_addr_t * dst_ip = dst;
-		struct in_addr in_addr;
-		(void)handle;
+	if (IS_ENABLED(CONFIG_NET_LOG)) {
+		char addr[NET_INET_ADDRSTRLEN];
 
-		ip_addr_copy( *result, *dst_ip );
-
-		return 1;
+		LOG_DBG("%d bytes from %s:%u", ret,
+			net_addr_ntop(NET_AF_INET, &from.sin_addr, addr, sizeof(addr)),
+			net_ntohs(from.sin_port));
 	}
 
-	/* As part of the zephyr "port", we must define some
-	 * memory allocation. */
-	void * mem_malloc( mem_size_t size )
-	{
-		return k_malloc( size );
+	snmp_process_datagram(evt->event.fd, recv_buf, (size_t)ret, &from);
+
+unlock:
+	snmp_agent_unlock();
+}
+
+NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(snmp_service, snmp_service_cb,
+				      ARRAY_SIZE(agent_fds));
+
+int net_snmp_agent_start(void)
+{
+	struct net_sockaddr_in bind_addr = {
+		.sin_family = NET_AF_INET,
+		.sin_addr = NET_INADDR_ANY_INIT,
+		.sin_port = net_htons(CONFIG_SNMP_AGENT_PORT),
+	};
+	int sock;
+	int ret;
+
+	snmp_agent_lock();
+
+	if (agent_sock >= 0) {
+		ret = 0;
+		goto unlock;
 	}
 
-	void mem_free( void * rmem )
-	{
-		k_free( rmem );
+	sock = zsock_socket(NET_AF_INET, NET_SOCK_DGRAM, NET_IPPROTO_UDP);
+	if (sock < 0) {
+		ret = -errno;
+		LOG_ERR("cannot create the agent socket, %d", ret);
+		goto unlock;
 	}
 
-	void * mem_trim( void * rmem,
-					 mem_size_t newsize )
-	{
-		( void ) rmem;
-		( void ) newsize;
-		return rmem;
+	ret = zsock_bind(sock, (struct net_sockaddr *)&bind_addr, sizeof(bind_addr));
+	if (ret < 0) {
+		ret = -errno;
+		LOG_ERR("cannot bind to port %d, %d", CONFIG_SNMP_AGENT_PORT, ret);
+		(void)zsock_close(sock);
+		goto unlock;
 	}
 
-	void * memp_malloc( memp_t type )
-	{
-		(void)type;
-		__ASSERT( false, "memp_malloc() should not be called" );
-		return NULL;
+	agent_fds[0].fd = sock;
+	agent_fds[0].events = ZSOCK_POLLIN;
+
+	ret = net_socket_service_register(&snmp_service, agent_fds,
+					  ARRAY_SIZE(agent_fds), NULL);
+	if (ret < 0) {
+		LOG_ERR("cannot register the socket service, %d", ret);
+		agent_fds[0].fd = -1;
+		(void)zsock_close(sock);
+		goto unlock;
 	}
 
-	void memp_free( memp_t type,
-					void * mem )
-	{
-		( void ) type;
-		( void ) type;
-		( void ) mem;
-		__ASSERT( false, "memp_free() should not be called" );
+	agent_sock = sock;
+
+	/* Traps leave from the same socket. Their destination is still the
+	 * manager's port 162; only the source port is shared. */
+	snmp_traps_handle = (void *)(intptr_t)sock;
+
+	LOG_INF("SNMP agent listening on UDP port %d", CONFIG_SNMP_AGENT_PORT);
+	ret = 0;
+
+unlock:
+	snmp_agent_unlock();
+
+	return ret;
+}
+
+int net_snmp_agent_stop(void)
+{
+	int ret = 0;
+
+	snmp_agent_lock();
+
+	if (agent_sock < 0) {
+		goto unlock;
 	}
 
-	u32_t sys_now( void )
-	{
-		return k_uptime_get();
+	/* Unregister before closing, so the service thread cannot poll a
+	 * descriptor that has already been handed back. */
+	ret = net_socket_service_unregister(&snmp_service);
+	if (ret < 0) {
+		LOG_ERR("cannot unregister the socket service, %d", ret);
+		goto unlock;
 	}
 
+	(void)zsock_close(agent_sock);
+
+	agent_sock = -1;
+	agent_fds[0].fd = -1;
+	snmp_traps_handle = (void *)(intptr_t)-1;
+
+	LOG_INF("SNMP agent stopped");
+
+unlock:
+	snmp_agent_unlock();
+
+	return ret;
+}
+
+int net_snmp_agent_trap_dst_set(const char *ip_address)
+{
+	struct net_in_addr addr;
+	ip_addr_t dst;
+	int ret;
+
+	if (ip_address == NULL) {
+		return -EINVAL;
+	}
+
+	ret = net_addr_pton(NET_AF_INET, ip_address, &addr);
+	if (ret < 0) {
+		LOG_ERR("cannot parse trap destination \"%s\"", ip_address);
+		return -EINVAL;
+	}
+
+	dst.addr = addr.s_addr;
+
+	snmp_agent_lock();
+	snmp_set_default_trap_version(SNMP_VERSION_2c);
+	snmp_trap_dst_enable(0, true);
+	snmp_trap_dst_ip_set(0, &dst);
+	snmp_agent_unlock();
+
+	return 0;
+}
+
+/**
+ * @brief Send one encoded message, called by the agent core.
+ *
+ * @param handle The socket the request arrived on, as an opaque value.
+ * @param p      The encoded message.
+ * @param dst    Destination address.
+ * @param port   Destination port, in network byte order.
+ */
+err_t snmp_sendto(void *handle, struct pbuf *p, const ip_addr_t *dst, u16_t port)
+{
+	struct net_sockaddr_in to = {
+		.sin_family = NET_AF_INET,
+		.sin_port = port,
+	};
+	int sock = (int)(intptr_t)handle;
+	int ret;
+
+	to.sin_addr.s_addr = dst->addr;
+
+	ret = zsock_sendto(sock, p->payload, p->len, 0,
+			   (struct net_sockaddr *)&to, sizeof(to));
+	if (ret < 0) {
+		LOG_ERR("sendto failed, errno %d", errno);
+		return ERR_CONN;
+	}
+
+	return ERR_OK;
+}
+
+u8_t snmp_get_local_ip_for_dst(void *handle, const ip_addr_t *dst, ip_addr_t *result)
+{
+	(void)handle;
+
+	ip_addr_copy(*result, *dst);
+
+	return 1;
+}
+
+/* As part of the Zephyr port, the agent's memory allocation is mapped onto
+ * the kernel heap. */
+void *mem_malloc(mem_size_t size)
+{
+	return k_malloc(size);
+}
+
+void mem_free(void *rmem)
+{
+	k_free(rmem);
+}
+
+void *mem_trim(void *rmem, mem_size_t newsize)
+{
+	(void)newsize;
+
+	return rmem;
+}
+
+void *memp_malloc(memp_t type)
+{
+	(void)type;
+	__ASSERT(false, "memp_malloc() should not be called");
+
+	return NULL;
+}
+
+void memp_free(memp_t type, void *mem)
+{
+	(void)type;
+	(void)mem;
+	__ASSERT(false, "memp_free() should not be called");
+}
+
+u32_t sys_now(void)
+{
+	return k_uptime_get();
+}
 
 const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len,
 			    const u32_t *oid_words)
@@ -439,3 +408,20 @@ const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len,
 	return buf;
 }
 
+/* Link stubs for lwIP globals the MIB-2 groups still reference. They are
+ * never populated in this port; the groups that read them are rewritten
+ * against Zephyr's own interfaces in a later phase. */
+
+const ip_addr_t ip_addr_any;
+
+/** udp_pcbs export for external reference (e.g. SNMP agent) */
+struct udp_pcb *udp_pcbs;
+
+/** Global variable containing lwIP internal statistics. */
+struct stats_ lwip_stats;
+
+/** Global variable containing the list of network interfaces. */
+struct netif *netif_list;
+
+/** The default network interface. */
+struct netif *netif_default;
