@@ -1,0 +1,44 @@
+# Copyright (c) 2026 Cliff Brake
+# SPDX-License-Identifier: Apache-2.0
+
+name: release
+
+# There is nothing to build here: the module compiles only as part of a Zephyr
+# application, so a release is the tag plus the notes for it. Pushing a "v*"
+# tag publishes a GitHub release whose body is that version's CHANGELOG.md
+# section.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the module
+        uses: actions/checkout@v5
+
+      - name: Extract the release notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          ./scripts/extract-changelog.sh "$TAG" > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "CHANGELOG.md has no section for $TAG" >&2
+            exit 1
+          fi
+          cat release-notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
+            --verify-tag

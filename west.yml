@@ -1,0 +1,24 @@
+# Manifest for building this module on its own, which continuous integration
+# uses to create a workspace around the checkout. Applications consuming the
+# module do not need this file: they add zephyr-snmp to the projects list of
+# their own manifest, as the README describes.
+
+manifest:
+  self:
+    path: modules/lib/zephyr-snmp
+
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.4.1
+      import:
+        # native_sim needs very little, and every module cloned here is time
+        # spent on every run.
+        name-allowlist:
+          - cmsis
+          - cmsis_6
+          - picolibc

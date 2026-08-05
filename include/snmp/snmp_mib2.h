@@ -1,6 +1,6 @@
 /**
  * @file
- * SNMP pbuf stream wrapper (internal API, do not use in client code).
+ * SNMP MIB2 API
  */
 
 /*
@@ -31,48 +31,44 @@
  *
  * This file is part of the lwIP TCP/IP stack.
  *
- * Author: Martin Hentschel <info@cl-soft.de>
+ * Author: Dirk Ziegelmeier <dziegel@gmx.de>
  *
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
-#ifndef LWIP_HDR_APPS_SNMP_PBUF_STREAM_H
-#define LWIP_HDR_APPS_SNMP_PBUF_STREAM_H
+#ifndef ZEPHYR_INCLUDE_SNMP_MIB2_H_
+#define ZEPHYR_INCLUDE_SNMP_MIB2_H_
 
 #include <snmp/snmp_opts.h>
-#include "snmp_priv.h"
-
-#if LWIP_SNMP
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** A cursor over a flat buffer: @a offset is the position from @a data,
- *  @a length the number of bytes still reachable from there.
- */
-struct snmp_pbuf_stream {
-	uint8_t *data;
-	uint16_t offset;
-	uint16_t length;
-};
+#if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
+#if SNMP_LWIP_MIB2
 
-int snmp_pbuf_stream_init(struct snmp_pbuf_stream *pbuf_stream, uint8_t *data, uint16_t offset,
-			  uint16_t length);
-int snmp_pbuf_stream_read(struct snmp_pbuf_stream *pbuf_stream, uint8_t *data);
-int snmp_pbuf_stream_write(struct snmp_pbuf_stream *pbuf_stream, uint8_t data);
-int snmp_pbuf_stream_writebuf(struct snmp_pbuf_stream *pbuf_stream, const void *buf,
-			      uint16_t buf_len);
-int snmp_pbuf_stream_writeto(struct snmp_pbuf_stream *pbuf_stream,
-			     struct snmp_pbuf_stream *target_pbuf_stream, uint16_t len);
-int snmp_pbuf_stream_seek(struct snmp_pbuf_stream *pbuf_stream, int32_t offset);
-int snmp_pbuf_stream_seek_abs(struct snmp_pbuf_stream *pbuf_stream, uint32_t offset);
+#include <snmp/snmp_core.h>
+
+extern const struct snmp_mib mib2;
+
+#ifndef SNMP_SYSSERVICES
+#define SNMP_SYSSERVICES ((1 << 6) | (1 << 3))
+#endif
+
+void snmp_mib2_set_sysdescr(const uint8_t *str, const uint16_t *len); /* read-only be definition */
+void snmp_mib2_set_syscontact(uint8_t *ocstr, uint16_t *ocstrlen, uint16_t bufsize);
+void snmp_mib2_set_syscontact_readonly(const uint8_t *ocstr, const uint16_t *ocstrlen);
+void snmp_mib2_set_sysname(uint8_t *ocstr, uint16_t *ocstrlen, uint16_t bufsize);
+void snmp_mib2_set_sysname_readonly(const uint8_t *ocstr, const uint16_t *ocstrlen);
+void snmp_mib2_set_syslocation(uint8_t *ocstr, uint16_t *ocstrlen, uint16_t bufsize);
+void snmp_mib2_set_syslocation_readonly(const uint8_t *ocstr, const uint16_t *ocstrlen);
+
+#endif /* SNMP_LWIP_MIB2 */
+#endif /* LWIP_SNMP */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* LWIP_SNMP */
-
-#endif /* LWIP_HDR_APPS_SNMP_PBUF_STREAM_H */
+#endif /* ZEPHYR_INCLUDE_SNMP_MIB2_H_ */

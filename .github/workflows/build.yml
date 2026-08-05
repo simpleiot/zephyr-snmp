@@ -1,0 +1,73 @@
+# Copyright (c) 2025 Cliff Brake
+# SPDX-License-Identifier: Apache-2.0
+
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  twister:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the module
+        uses: actions/checkout@v5
+        with:
+          path: modules/lib/zephyr-snmp
+          # checkpatch below compares against the base of the branch.
+          fetch-depth: 0
+
+      # Creates the workspace around the checkout from the module's own
+      # west.yml, and installs the toolchain and Python requirements. It also
+      # installs the 32-bit host support that native_sim needs, so no separate
+      # apt step is required.
+      # "west init -l" puts the workspace at the parent of app-path, so
+      # app-path is a single directory and base-path holds the rest: the
+      # workspace ends up at modules/lib, matching self.path in west.yml.
+      - name: Set up Zephyr
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          base-path: modules/lib
+          app-path: zephyr-snmp
+          toolchains: x86_64-zephyr-elf
+
+      # Builds every configuration in samples/agent/sample.yaml, which covers
+      # both the default zeth build and the offloaded-sockets one.
+      - name: Build the samples
+        working-directory: modules/lib/zephyr-snmp
+        run: |
+          west twister \
+            --testsuite-root samples \
+            --platform native_sim \
+            --inline-logs \
+            --verbose
+
+      # Style settings come from .checkpatch.conf; the typedefs list it relies
+      # on ships with Zephyr, so point at the copy in the workspace.
+      - name: Run checkpatch on the changes
+        if: always()
+        working-directory: modules/lib/zephyr-snmp
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git config --global --add safe.directory "$PWD"
+          base="${BASE_SHA:-HEAD~1}"
+          zephyr_base="$(west list -f '{abspath}' zephyr)"
+          git diff "$base"..HEAD | \
+            "$zephyr_base/scripts/checkpatch.pl" --no-tree \
+              --typedefsfile="$zephyr_base/scripts/checkpatch/typedefsfile" -
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: twister-results
+          path: modules/lib/zephyr-snmp/twister-out/twister.xml
+          if-no-files-found: ignore

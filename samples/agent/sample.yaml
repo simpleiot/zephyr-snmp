@@ -1,0 +1,23 @@
+sample:
+  description: SNMP agent serving the MIB-2 tree on UDP port 161
+  name: snmp_agent
+common:
+  harness: net
+  depends_on: netif
+tests:
+  sample.net.snmp.agent:
+    build_only: true
+    platform_allow:
+      - native_sim
+    tags:
+      - net
+      - snmp
+  sample.net.snmp.agent.host:
+    build_only: true
+    platform_allow:
+      - native_sim
+    extra_args:
+      - EXTRA_CONF_FILE=overlay-host.conf
+    tags:
+      - net
+      - snmp

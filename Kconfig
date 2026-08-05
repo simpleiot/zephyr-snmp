@@ -1,22 +1,77 @@
-menuconfig LIB_SNMP
-	bool "Enable the SNMP library"
-	default n
+# Copyright (c) 2025 lwIP contributors
+# SPDX-License-Identifier: BSD-3-Clause
+
+menuconfig SNMP_AGENT
+	bool "SNMP agent"
+	depends on NET_IPV4 && NET_UDP
+	select NET_SOCKETS
+	select NET_SOCKETS_SERVICE
 	help
-	  Library routines for SNMP
+	  Enable an SNMP v1/v2c agent. The agent serves get, getnext, getbulk,
+	  and set requests on UDP port 161 and sends traps to UDP port 162.
 
-if LIB_SNMP
+	  The agent runs on the shared socket service thread rather than a
+	  thread of its own, so CONFIG_NET_SOCKETS_SERVICE_STACK_SIZE may need
+	  raising to cover request processing.
 
-config SNMP_LOG_LEVEL
-	int "Default log level for SNMP"
-	default 4
+if SNMP_AGENT
+
+config SNMP_AGENT_MAX_MSG_SIZE
+	int "Maximum SNMP message size in bytes"
+	default 484
+	range 96 1472
 	help
-		The default log level, which is used to filter log messages.
+	  Size of the receive and transmit buffers, and so the largest request
+	  the agent accepts and the largest response it produces. RFC 1157
+	  requires an agent to accept at least 484 bytes. Larger values allow
+	  more variable bindings per request at the cost of static RAM.
 
-		0: None
-		1: Error
-		2: Warn
-		3: Info
-		4: Debug
-		5: Verbose
+config SNMP_AGENT_TRAP_DESTINATIONS
+	int "Number of trap destinations"
+	default 1
+	range 1 8
+	help
+	  How many managers the agent can be configured to send traps to.
 
-endif #LIB_SNMP
+config SNMP_AGENT_PORT
+	int "UDP port the agent listens on"
+	default 161
+	help
+	  The port requests arrive on. Change it only for testing; managers
+	  expect the IANA-assigned port 161.
+
+config SNMP_AGENT_TRAP_PORT
+	int "UDP port traps are sent to"
+	default 162
+	help
+	  The port traps are addressed to. Change it only for testing; managers
+	  listen on the IANA-assigned port 162.
+
+config SNMP_AGENT_MIB2_SYSTEM
+	bool "MIB-2 system group"
+	default y
+	help
+	  Publish sysDescr, sysObjectID, sysUpTime, sysContact, sysName,
+	  sysLocation, and sysServices. Applications supply the values through
+	  the snmp_mib2_set_sys*() functions.
+
+config SNMP_AGENT_MIB2_INTERFACES
+	bool "MIB-2 interfaces group"
+	default y
+	help
+	  Publish ifNumber and ifTable, backed by Zephyr's network interfaces.
+	  The per-interface counters read as zero unless
+	  CONFIG_NET_STATISTICS_PER_INTERFACE is also enabled.
+
+config SNMP_AGENT_MIB2_SNMP
+	bool "MIB-2 snmp group"
+	default y
+	help
+	  Publish the agent's own message counters.
+
+module = SNMP_AGENT
+module-dep = NET_LOG
+module-str = Log level for SNMP agent
+source "subsys/net/Kconfig.template.log_config.net"
+
+endif # SNMP_AGENT

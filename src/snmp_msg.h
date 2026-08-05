@@ -33,25 +33,21 @@
  * Author: Christiaan Simons <christiaan.simons@axon.tv>
  *         Martin Hentschel <info@cl-soft.de>
  *         Elias Oenal <lwip@eliasoenal.com>
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #ifndef LWIP_HDR_APPS_SNMP_MSG_H
 #define LWIP_HDR_APPS_SNMP_MSG_H
 
-#include "lwip/apps/snmp_opts.h"
+#include <snmp/snmp_opts.h>
+#include "snmp_priv.h"
 
 #if LWIP_SNMP
 
-#include "lwip/apps/snmp.h"
-#include "lwip/apps/snmp_core.h"
+#include <snmp/snmp.h>
+#include <snmp/snmp_core.h>
 #include "snmp_pbuf_stream.h"
-#include "lwip/ip_addr.h"
-#include "lwip/err.h"
-
-#if LWIP_SNMP_V3
-#include "snmpv3_priv.h"
-#endif
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,110 +59,84 @@ extern "C" {
 #define SNMP_VERSION_3  3
 
 struct snmp_varbind_enumerator {
-  struct snmp_pbuf_stream pbuf_stream;
-  u16_t varbind_count;
+	struct snmp_pbuf_stream pbuf_stream;
+	uint16_t varbind_count;
 };
 
 typedef enum {
-  SNMP_VB_ENUMERATOR_ERR_OK            = 0,
-  SNMP_VB_ENUMERATOR_ERR_EOVB          = 1,
-  SNMP_VB_ENUMERATOR_ERR_ASN1ERROR     = 2,
-  SNMP_VB_ENUMERATOR_ERR_INVALIDLENGTH = 3
+	SNMP_VB_ENUMERATOR_ERR_OK = 0,
+	SNMP_VB_ENUMERATOR_ERR_EOVB = 1,
+	SNMP_VB_ENUMERATOR_ERR_ASN1ERROR = 2,
+	SNMP_VB_ENUMERATOR_ERR_INVALIDLENGTH = 3
 } snmp_vb_enumerator_err_t;
 
-void snmp_vb_enumerator_init(struct snmp_varbind_enumerator *enumerator, struct pbuf *p, u16_t offset, u16_t length);
-snmp_vb_enumerator_err_t snmp_vb_enumerator_get_next(struct snmp_varbind_enumerator *enumerator, struct snmp_varbind *varbind);
+void snmp_vb_enumerator_init(struct snmp_varbind_enumerator *enumerator, uint8_t *data,
+			     uint16_t offset, uint16_t length);
+snmp_vb_enumerator_err_t snmp_vb_enumerator_get_next(struct snmp_varbind_enumerator *enumerator,
+						     struct snmp_varbind *varbind);
 
 #define SNMP_MAX_COMMUNITY_SIZE 12U
 
+/** Bytes of the scratch buffer each request carries for varbind values. */
+#define SNMP_VALUE_BUFFER_SIZE 64
+
 struct snmp_request {
-  /* Communication handle */
-  void *handle;
-  /* source IP address */
-  const ip_addr_t *source_ip;
-  /* source UDP port */
-  u16_t source_port;
-  /* incoming snmp version */
-  u8_t version;
-  /* community name (zero terminated) */
-  u8_t community[SNMP_MAX_COMMUNITY_SIZE + 1];
-  /* community string length (exclusive zero term) */
-  u16_t community_strlen;
-  /* request type */
-  u8_t request_type;
-  /* request ID */
-  s32_t request_id;
-  /* error status */
-  s32_t error_status;
-  /* error index */
-  s32_t error_index;
-  /* non-repeaters (getBulkRequest (SNMPv2c)) */
-  s32_t non_repeaters;
-  /* max-repetitions (getBulkRequest (SNMPv2c)) */
-  s32_t max_repetitions;
+	/* Communication handle */
+	void *handle;
+	/* source IP address */
+	const struct net_in_addr *source_ip;
+	/* source UDP port */
+	uint16_t source_port;
+	/* incoming snmp version */
+	uint8_t version;
+	/* community name (zero terminated) */
+	uint8_t community[SNMP_MAX_COMMUNITY_SIZE + 1];
+	/* community string length (exclusive zero term) */
+	uint16_t community_strlen;
+	/* request type */
+	uint8_t request_type;
+	/* request ID */
+	int32_t request_id;
+	/* error status */
+	int32_t error_status;
+	/* error index */
+	int32_t error_index;
+	/* non-repeaters (getBulkRequest (SNMPv2c)) */
+	int32_t non_repeaters;
+	/* max-repetitions (getBulkRequest (SNMPv2c)) */
+	int32_t max_repetitions;
 
-  /* Usually response-pdu (2). When snmpv3 errors are detected report-pdu(8) */
-  u8_t request_out_type;
+	/* Usually response-pdu (2). When snmpv3 errors are detected report-pdu(8) */
+	uint8_t request_out_type;
 
-#if LWIP_SNMP_V3
-  s32_t msg_id;
-  s32_t msg_max_size;
-  u8_t  msg_flags;
-  s32_t msg_security_model;
-  u8_t  msg_authoritative_engine_id[SNMP_V3_MAX_ENGINE_ID_LENGTH];
-  u8_t  msg_authoritative_engine_id_len;
-  s32_t msg_authoritative_engine_boots;
-  s32_t msg_authoritative_engine_time;
-  u8_t  msg_user_name[SNMP_V3_MAX_USER_LENGTH];
-  u8_t  msg_user_name_len;
-  u8_t  msg_authentication_parameters[SNMP_V3_MAX_AUTH_PARAM_LENGTH];
-  u8_t  msg_authentication_parameters_len;
-  u8_t  msg_privacy_parameters[SNMP_V3_MAX_PRIV_PARAM_LENGTH];
-  u8_t  msg_privacy_parameters_len;
-  u8_t  context_engine_id[SNMP_V3_MAX_ENGINE_ID_LENGTH];
-  u8_t  context_engine_id_len;
-  u8_t  context_name[SNMP_V3_MAX_ENGINE_ID_LENGTH];
-  u8_t  context_name_len;
-#endif
+	uint8_t *inbound_buf;
+	uint16_t inbound_len;
+	struct snmp_varbind_enumerator inbound_varbind_enumerator;
+	uint16_t inbound_varbind_offset;
+	uint16_t inbound_varbind_len;
+	uint16_t inbound_padding_len;
 
-  struct pbuf *inbound_pbuf;
-  struct snmp_varbind_enumerator inbound_varbind_enumerator;
-  u16_t inbound_varbind_offset;
-  u16_t inbound_varbind_len;
-  u16_t inbound_padding_len;
+	uint8_t *outbound_buf;
+	uint16_t outbound_buf_size;
+	/** Set once the frame is complete; the number of bytes to send. */
+	uint16_t outbound_len;
+	struct snmp_pbuf_stream outbound_pbuf_stream;
+	uint16_t outbound_pdu_offset;
+	uint16_t outbound_error_status_offset;
+	uint16_t outbound_error_index_offset;
+	uint16_t outbound_varbind_offset;
 
-  struct pbuf *outbound_pbuf;
-  struct snmp_pbuf_stream outbound_pbuf_stream;
-  u16_t outbound_pdu_offset;
-  u16_t outbound_error_status_offset;
-  u16_t outbound_error_index_offset;
-  u16_t outbound_varbind_offset;
-#if LWIP_SNMP_V3
-  u16_t outbound_msg_global_data_offset;
-  u16_t outbound_msg_global_data_end;
-  u16_t outbound_msg_security_parameters_str_offset;
-  u16_t outbound_msg_security_parameters_seq_offset;
-  u16_t outbound_msg_security_parameters_end;
-  u16_t outbound_msg_authentication_parameters_offset;
-  u16_t outbound_scoped_pdu_seq_offset;
-  u16_t outbound_scoped_pdu_string_offset;
-#endif
-
-//u8_t value_buffer[SNMP_MAX_VALUE_SIZE];
-/* _HT_ I think that a length of 128 should be supported. */
-#define SNMP_VALUE_BUFFER_SIZE   64
-
-  u8_t value_buffer[SNMP_VALUE_BUFFER_SIZE];
+	uint8_t value_buffer[SNMP_VALUE_BUFFER_SIZE];
 };
 
 /** A helper struct keeping length information about varbinds */
 struct snmp_varbind_len {
-  u8_t  vb_len_len;
-  u16_t vb_value_len;
-  u8_t  oid_len_len;
-  u16_t oid_value_len;
-  u8_t  value_len_len;
-  u16_t value_value_len;
+	uint8_t vb_len_len;
+	uint16_t vb_value_len;
+	uint8_t oid_len_len;
+	uint16_t oid_value_len;
+	uint8_t value_len_len;
+	uint16_t value_value_len;
 };
 
 /** Agent community string */
@@ -176,11 +146,15 @@ extern const char *snmp_community_write;
 /** handle for sending traps */
 extern void *snmp_traps_handle;
 
-void snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t port);
-err_t snmp_sendto(void *handle, struct pbuf *p, const ip_addr_t *dst, u16_t port);
-u8_t snmp_get_local_ip_for_dst(void *handle, const ip_addr_t *dst, ip_addr_t *result);
-err_t snmp_varbind_length(struct snmp_varbind *varbind, struct snmp_varbind_len *len);
-err_t snmp_append_outbound_varbind(struct snmp_pbuf_stream *pbuf_stream, struct snmp_varbind *varbind);
+void snmp_receive(void *handle, uint8_t *data, uint16_t len, const struct net_in_addr *source_ip,
+		  uint16_t port);
+int snmp_sendto(void *handle, const uint8_t *data, uint16_t len, const struct net_in_addr *dst,
+		uint16_t port);
+uint8_t snmp_get_local_ip_for_dst(void *handle, const struct net_in_addr *dst,
+				  struct net_in_addr *result);
+int snmp_varbind_length(struct snmp_varbind *varbind, struct snmp_varbind_len *len);
+int snmp_append_outbound_varbind(struct snmp_pbuf_stream *pbuf_stream,
+				 struct snmp_varbind *varbind);
 
 #ifdef __cplusplus
 }
