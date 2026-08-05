@@ -44,3 +44,16 @@ snmpwalk -v2c -c public 192.0.2.1 1
 ```
 
 When finished, `sudo net-tools/net-setup.sh stop` removes the interface.
+
+## Running without root
+
+`overlay-host.conf` builds the sample against the host's own network stack
+instead of the TAP interface, so no root is needed. The agent moves to
+unprivileged ports, since 161 and 162 are reserved:
+
+```sh
+west build -b native_sim path/to/zephyr-snmp/samples/agent \
+	-- -DEXTRA_CONF_FILE=overlay-host.conf
+./build/zephyr/zephyr.exe &
+snmpwalk -v2c -c public 127.0.0.1:1161 1
+```
