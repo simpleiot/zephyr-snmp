@@ -18,21 +18,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the module
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: modules/lib/zephyr-snmp
           # checkpatch below compares against the base of the branch.
           fetch-depth: 0
 
-      # native_sim builds 32-bit by default, so the host compiler needs its
-      # 32-bit support alongside the toolchain the setup action installs.
-      - name: Install 32-bit host support
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y gcc-multilib g++-multilib
-
       # Creates the workspace around the checkout from the module's own
-      # west.yml, and installs the toolchain and Python requirements.
+      # west.yml, and installs the toolchain and Python requirements. It also
+      # installs the 32-bit host support that native_sim needs, so no separate
+      # apt step is required.
       # "west init -l" puts the workspace at the parent of app-path, so
       # app-path is a single directory and base-path holds the rest: the
       # workspace ends up at modules/lib, matching self.path in west.yml.
@@ -71,7 +66,7 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: twister-results
           path: modules/lib/zephyr-snmp/twister-out/twister.xml
