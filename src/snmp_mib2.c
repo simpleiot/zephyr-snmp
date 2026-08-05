@@ -57,39 +57,29 @@
 #include "lwip/apps/snmp_scalar.h"
 
 
-/* dot3 and EtherLike MIB not planned. (transmission .1.3.6.1.2.1.10) */
-/* historical (some say hysterical). (cmot .1.3.6.1.2.1.9) */
-/* lwIP has no EGP, thus may not implement it. (egp .1.3.6.1.2.1.8) */
+/* The groups this port publishes are the ones it can answer from Zephyr:
+ * system, interfaces, and snmp. The ip and udp groups were dropped because
+ * every scalar in them read an lwIP global that this port never populates,
+ * so they reported zeros and empty tables; reporting nothing is more honest
+ * than reporting zero. They can return backed by net_stats and
+ * net_context_foreach(). The at, icmp, and tcp groups were never compiled.
+ */
 
 /* --- mib-2 .1.3.6.1.2.1 ----------------------------------------------------- */
-extern const struct snmp_scalar_array_node snmp_mib2_snmp_root;
-extern const struct snmp_tree_node snmp_mib2_udp_root;
-extern const struct snmp_tree_node snmp_mib2_tcp_root;
-extern const struct snmp_scalar_array_node snmp_mib2_icmp_root;
-extern const struct snmp_tree_node snmp_mib2_interface_root;
 extern const struct snmp_scalar_array_node snmp_mib2_system_node;
-extern const struct snmp_tree_node snmp_mib2_at_root;
-extern const struct snmp_tree_node snmp_mib2_ip_root;
+extern const struct snmp_tree_node snmp_mib2_interface_root;
+extern const struct snmp_scalar_array_node snmp_mib2_snmp_root;
 
 static const struct snmp_node *const mib2_nodes[] = {
+#ifdef CONFIG_SNMP_AGENT_MIB2_SYSTEM
   &snmp_mib2_system_node.node.node,
+#endif
+#ifdef CONFIG_SNMP_AGENT_MIB2_INTERFACES
   &snmp_mib2_interface_root.node,
-#if LWIP_ARP && LWIP_IPV4
-  &snmp_mib2_at_root.node,
-#endif /* LWIP_ARP && LWIP_IPV4 */
-#if LWIP_IPV4
-  &snmp_mib2_ip_root.node,
-#endif /* LWIP_IPV4 */
-#if LWIP_ICMP
-  &snmp_mib2_icmp_root.node.node,
-#endif /* LWIP_ICMP */
-#if LWIP_TCP
-  &snmp_mib2_tcp_root.node,
-#endif /* LWIP_TCP */
-#if LWIP_UDP
-  &snmp_mib2_udp_root.node,
-#endif /* LWIP_UDP */
-  &snmp_mib2_snmp_root.node.node
+#endif
+#ifdef CONFIG_SNMP_AGENT_MIB2_SNMP
+  &snmp_mib2_snmp_root.node.node,
+#endif
 };
 
 static const struct snmp_tree_node mib2_root = SNMP_CREATE_TREE_NODE(1, mib2_nodes);

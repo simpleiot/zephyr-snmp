@@ -47,6 +47,28 @@ config SNMP_AGENT_TRAP_PORT
 	  The port traps are addressed to. Change it only for testing; managers
 	  listen on the IANA-assigned port 162.
 
+config SNMP_AGENT_MIB2_SYSTEM
+	bool "MIB-2 system group"
+	default y
+	help
+	  Publish sysDescr, sysObjectID, sysUpTime, sysContact, sysName,
+	  sysLocation, and sysServices. Applications supply the values through
+	  the snmp_mib2_set_sys*() functions.
+
+config SNMP_AGENT_MIB2_INTERFACES
+	bool "MIB-2 interfaces group"
+	default y
+	help
+	  Publish ifNumber and ifTable, backed by Zephyr's network interfaces.
+	  The per-interface counters read as zero unless
+	  CONFIG_NET_STATISTICS_PER_INTERFACE is also enabled.
+
+config SNMP_AGENT_MIB2_SNMP
+	bool "MIB-2 snmp group"
+	default y
+	help
+	  Publish the agent's own message counters.
+
 module = SNMP_AGENT
 module-dep = NET_LOG
 module-str = Log level for SNMP agent

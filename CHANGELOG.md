@@ -59,6 +59,18 @@ and this project adheres to
 - drop the dependency on `CONFIG_POSIX_API` by using the namespaced
   networking API throughout, and the `VERSION` file requirement by dropping
   an `<app_version.h>` include that nothing used
+- back the MIB-2 `interfaces` group with Zephyr's own data: `net_if_foreach()`
+  and the interface accessors supply ifNumber and ifTable, including names,
+  link type, MTU, hardware address, and admin and operational status, with the
+  counters coming from `net_stats` when `CONFIG_NET_STATISTICS_PER_INTERFACE`
+  is enabled. It previously walked lwIP's `netif_list`, which this port never
+  populated, so ifNumber was always 0 and ifTable always empty
+- drop the MIB-2 `ip` and `udp` groups, whose every scalar read an lwIP global
+  that this port never populated and so reported zero. Reporting nothing is
+  more accurate than reporting a wrong zero; they can return backed by
+  `net_stats` and `net_context_foreach()`
+- gate the published groups with `CONFIG_SNMP_AGENT_MIB2_SYSTEM`,
+  `CONFIG_SNMP_AGENT_MIB2_INTERFACES`, and `CONFIG_SNMP_AGENT_MIB2_SNMP`
 - back `snmp_pbuf_stream` with a flat buffer cursor and delete `src/pbuf.c`,
   `lwip/pbuf.h`, and the `mem`/`memp` headers and stubs. Messages are encoded
   into static buffers of `CONFIG_SNMP_AGENT_MAX_MSG_SIZE` bytes, one for
