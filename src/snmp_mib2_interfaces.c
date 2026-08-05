@@ -39,12 +39,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "lwip/def.h"
-#include "lwip/apps/snmp.h"
-#include "lwip/apps/snmp_core.h"
-#include "lwip/apps/snmp_mib2.h"
-#include "lwip/apps/snmp_table.h"
-#include "lwip/apps/snmp_scalar.h"
+#include <snmp/snmp.h>
+#include <snmp/snmp_core.h>
+#include <snmp/snmp_mib2.h>
+#include <snmp/snmp_table.h>
+#include <snmp/snmp_scalar.h>
+#include "snmp_priv.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -59,30 +59,30 @@ LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 /* --- interfaces .1.3.6.1.2.1.2 ----------------------------------------------------- */
 
 /** ifOperStatus and ifAdminStatus values from RFC 1213. */
-#define IFSTATUS_UP              1
-#define IFSTATUS_DOWN            2
-#define IFSTATUS_LOWERLAYERDOWN  7
+#define IFSTATUS_UP             1
+#define IFSTATUS_DOWN           2
+#define IFSTATUS_LOWERLAYERDOWN 7
 
 /** ifType values from the IANAifType registry. */
-#define IFTYPE_OTHER              1
-#define IFTYPE_ETHERNETCSMACD     6
-#define IFTYPE_SOFTWARELOOPBACK  24
+#define IFTYPE_OTHER            1
+#define IFTYPE_ETHERNETCSMACD   6
+#define IFTYPE_SOFTWARELOOPBACK 24
 #define IFTYPE_IEEE802154       259
 #define IFTYPE_BLUETOOTH        272
 
 static void interfaces_count_cb(struct net_if *iface, void *user_data)
 {
-	s32_t *count = user_data;
+	int32_t *count = user_data;
 
 	ARG_UNUSED(iface);
 	(*count)++;
 }
 
-static s16_t interfaces_get_value(struct snmp_node_instance *instance, void *value)
+static int16_t interfaces_get_value(struct snmp_node_instance *instance, void *value)
 {
 	if (instance->node->oid == 1) {
-		s32_t *sint_ptr = (s32_t *)value;
-		s32_t count = 0;
+		int32_t *sint_ptr = (int32_t *)value;
+		int32_t count = 0;
 
 		net_if_foreach(interfaces_count_cb, &count);
 		*sint_ptr = count;
@@ -95,11 +95,11 @@ static s16_t interfaces_get_value(struct snmp_node_instance *instance, void *val
 
 /* list of allowed value ranges for incoming OID */
 static const struct snmp_oid_range interfaces_Table_oid_ranges[] = {
-	{ 1, 0xff } /* interface indices are small and 1-based */
+	{1, 0xff} /* interface indices are small and 1-based */
 };
 
-static snmp_err_t interfaces_Table_get_cell_instance(const u32_t *column, const u32_t *row_oid,
-						     u8_t row_oid_len,
+static snmp_err_t interfaces_Table_get_cell_instance(const uint32_t *column,
+						     const uint32_t *row_oid, uint8_t row_oid_len,
 						     struct snmp_node_instance *cell_instance)
 {
 	struct net_if *iface;
@@ -130,20 +130,21 @@ struct interfaces_next_ctx {
 static void interfaces_next_cb(struct net_if *iface, void *user_data)
 {
 	struct interfaces_next_ctx *ctx = user_data;
-	u32_t test_oid[LWIP_ARRAYSIZE(interfaces_Table_oid_ranges)];
+	uint32_t test_oid[LWIP_ARRAYSIZE(interfaces_Table_oid_ranges)];
 
-	test_oid[0] = (u32_t)net_if_get_by_iface(iface);
+	test_oid[0] = (uint32_t)net_if_get_by_iface(iface);
 
-	snmp_next_oid_check(ctx->state, test_oid, LWIP_ARRAYSIZE(interfaces_Table_oid_ranges), iface);
+	snmp_next_oid_check(ctx->state, test_oid, LWIP_ARRAYSIZE(interfaces_Table_oid_ranges),
+			    iface);
 }
 
-static snmp_err_t interfaces_Table_get_next_cell_instance(const u32_t *column,
+static snmp_err_t interfaces_Table_get_next_cell_instance(const uint32_t *column,
 							  struct snmp_obj_id *row_oid,
 							  struct snmp_node_instance *cell_instance)
 {
 	struct snmp_next_oid_state state;
-	struct interfaces_next_ctx ctx = { .state = &state };
-	u32_t result_temp[LWIP_ARRAYSIZE(interfaces_Table_oid_ranges)];
+	struct interfaces_next_ctx ctx = {.state = &state};
+	uint32_t result_temp[LWIP_ARRAYSIZE(interfaces_Table_oid_ranges)];
 
 	LWIP_UNUSED_ARG(column);
 
@@ -162,7 +163,7 @@ static snmp_err_t interfaces_Table_get_next_cell_instance(const u32_t *column,
 }
 
 /** Map the link layer onto the IANAifType the manager expects. */
-static s32_t interfaces_iftype(struct net_if *iface)
+static int32_t interfaces_iftype(struct net_if *iface)
 {
 	struct net_linkaddr *linkaddr = net_if_get_link_addr(iface);
 
@@ -191,14 +192,14 @@ static s32_t interfaces_iftype(struct net_if *iface)
  * without it every counter reads zero, which is what an agent should report
  * for a counter it does not maintain.
  */
-static u32_t interfaces_counter(struct net_if *iface, u8_t column)
+static uint32_t interfaces_counter(struct net_if *iface, uint8_t column)
 {
 #if defined(CONFIG_NET_STATISTICS_PER_INTERFACE)
 	const struct net_stats *stats = &iface->stats;
 
 	switch (column) {
 	case 10: /* ifInOctets */
-		return (u32_t)stats->bytes.received;
+		return (uint32_t)stats->bytes.received;
 	case 11: /* ifInUcastPkts */
 		return IS_ENABLED(CONFIG_NET_STATISTICS_IPV4) ? stats->ipv4.recv : 0;
 	case 13: /* ifInDiscards */
@@ -208,7 +209,7 @@ static u32_t interfaces_counter(struct net_if *iface, u8_t column)
 	case 15: /* ifInUnknownProtos */
 		return stats->ip_errors.protoerr;
 	case 16: /* ifOutOctets */
-		return (u32_t)stats->bytes.sent;
+		return (uint32_t)stats->bytes.sent;
 	case 17: /* ifOutUcastPkts */
 		return IS_ENABLED(CONFIG_NET_STATISTICS_IPV4) ? stats->ipv4.sent : 0;
 	default:
@@ -222,13 +223,13 @@ static u32_t interfaces_counter(struct net_if *iface, u8_t column)
 #endif /* CONFIG_NET_STATISTICS_PER_INTERFACE */
 }
 
-static s16_t interfaces_Table_get_value(struct snmp_node_instance *instance, void *value)
+static int16_t interfaces_Table_get_value(struct snmp_node_instance *instance, void *value)
 {
 	struct net_if *iface = (struct net_if *)instance->reference.ptr;
-	u32_t *value_u32 = (u32_t *)value;
-	s32_t *value_s32 = (s32_t *)value;
-	u8_t column = SNMP_TABLE_GET_COLUMN_FROM_OID(instance->instance_oid.id);
-	u16_t value_len;
+	uint32_t *value_u32 = (uint32_t *)value;
+	int32_t *value_s32 = (int32_t *)value;
+	uint8_t column = SNMP_TABLE_GET_COLUMN_FROM_OID(instance->instance_oid.id);
+	uint16_t value_len;
 
 	switch (column) {
 	case 1: /* ifIndex */
@@ -242,10 +243,10 @@ static s16_t interfaces_Table_get_value(struct snmp_node_instance *instance, voi
 		if (ret < 0) {
 			/* No name configured; report the index instead of an
 			 * empty string, which managers display poorly. */
-			value_len = (u16_t)snprintf(name, sizeof(name), "if%d",
-						    net_if_get_by_iface(iface));
+			value_len = (uint16_t)snprintf(name, sizeof(name), "if%d",
+						       net_if_get_by_iface(iface));
 		} else {
-			value_len = (u16_t)strlen(name);
+			value_len = (uint16_t)strlen(name);
 		}
 		MEMCPY(value, name, value_len);
 		break;
@@ -298,7 +299,7 @@ static s16_t interfaces_Table_get_value(struct snmp_node_instance *instance, voi
 		break;
 	/** @note returning zeroDotZero (0.0) no media specific MIB support */
 	case 22: /* ifSpecific */
-		value_len = snmp_zero_dot_zero.len * sizeof(u32_t);
+		value_len = snmp_zero_dot_zero.len * sizeof(uint32_t);
 		MEMCPY(value, snmp_zero_dot_zero.id, value_len);
 		break;
 	case 10: /* ifInOctets */
@@ -326,41 +327,38 @@ static const struct snmp_scalar_node interfaces_Number =
 	SNMP_SCALAR_CREATE_NODE_READONLY(1, SNMP_ASN1_TYPE_INTEGER, interfaces_get_value);
 
 static const struct snmp_table_col_def interfaces_Table_columns[] = {
-	{  1, SNMP_ASN1_TYPE_INTEGER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifIndex */
-	{  2, SNMP_ASN1_TYPE_OCTET_STRING, SNMP_NODE_INSTANCE_READ_ONLY }, /* ifDescr */
-	{  3, SNMP_ASN1_TYPE_INTEGER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifType */
-	{  4, SNMP_ASN1_TYPE_INTEGER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifMtu */
-	{  5, SNMP_ASN1_TYPE_GAUGE,        SNMP_NODE_INSTANCE_READ_ONLY }, /* ifSpeed */
-	{  6, SNMP_ASN1_TYPE_OCTET_STRING, SNMP_NODE_INSTANCE_READ_ONLY }, /* ifPhysAddress */
-	{  7, SNMP_ASN1_TYPE_INTEGER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifAdminStatus */
-	{  8, SNMP_ASN1_TYPE_INTEGER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifOperStatus */
-	{  9, SNMP_ASN1_TYPE_TIMETICKS,    SNMP_NODE_INSTANCE_READ_ONLY }, /* ifLastChange */
-	{ 10, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifInOctets */
-	{ 11, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifInUcastPkts */
-	{ 12, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifInNUcastPkts */
-	{ 13, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifInDiscards */
-	{ 14, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifInErrors */
-	{ 15, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifInUnknownProtos */
-	{ 16, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifOutOctets */
-	{ 17, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifOutUcastPkts */
-	{ 18, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifOutNUcastPkts */
-	{ 19, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifOutDiscards */
-	{ 20, SNMP_ASN1_TYPE_COUNTER,      SNMP_NODE_INSTANCE_READ_ONLY }, /* ifOutErrors */
-	{ 21, SNMP_ASN1_TYPE_GAUGE,        SNMP_NODE_INSTANCE_READ_ONLY }, /* ifOutQLen */
-	{ 22, SNMP_ASN1_TYPE_OBJECT_ID,    SNMP_NODE_INSTANCE_READ_ONLY }  /* ifSpecific */
+	{1, SNMP_ASN1_TYPE_INTEGER, SNMP_NODE_INSTANCE_READ_ONLY},      /* ifIndex */
+	{2, SNMP_ASN1_TYPE_OCTET_STRING, SNMP_NODE_INSTANCE_READ_ONLY}, /* ifDescr */
+	{3, SNMP_ASN1_TYPE_INTEGER, SNMP_NODE_INSTANCE_READ_ONLY},      /* ifType */
+	{4, SNMP_ASN1_TYPE_INTEGER, SNMP_NODE_INSTANCE_READ_ONLY},      /* ifMtu */
+	{5, SNMP_ASN1_TYPE_GAUGE, SNMP_NODE_INSTANCE_READ_ONLY},        /* ifSpeed */
+	{6, SNMP_ASN1_TYPE_OCTET_STRING, SNMP_NODE_INSTANCE_READ_ONLY}, /* ifPhysAddress */
+	{7, SNMP_ASN1_TYPE_INTEGER, SNMP_NODE_INSTANCE_READ_ONLY},      /* ifAdminStatus */
+	{8, SNMP_ASN1_TYPE_INTEGER, SNMP_NODE_INSTANCE_READ_ONLY},      /* ifOperStatus */
+	{9, SNMP_ASN1_TYPE_TIMETICKS, SNMP_NODE_INSTANCE_READ_ONLY},    /* ifLastChange */
+	{10, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifInOctets */
+	{11, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifInUcastPkts */
+	{12, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifInNUcastPkts */
+	{13, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifInDiscards */
+	{14, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifInErrors */
+	{15, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifInUnknownProtos */
+	{16, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifOutOctets */
+	{17, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifOutUcastPkts */
+	{18, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifOutNUcastPkts */
+	{19, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifOutDiscards */
+	{20, SNMP_ASN1_TYPE_COUNTER, SNMP_NODE_INSTANCE_READ_ONLY},     /* ifOutErrors */
+	{21, SNMP_ASN1_TYPE_GAUGE, SNMP_NODE_INSTANCE_READ_ONLY},       /* ifOutQLen */
+	{22, SNMP_ASN1_TYPE_OBJECT_ID, SNMP_NODE_INSTANCE_READ_ONLY}    /* ifSpecific */
 };
 
 /* Every column is read-only: bringing an interface down over SNMP would cut
  * the path the request arrived on. */
 static const struct snmp_table_node interfaces_Table = SNMP_TABLE_CREATE(
-	2, interfaces_Table_columns,
-	interfaces_Table_get_cell_instance, interfaces_Table_get_next_cell_instance,
-	interfaces_Table_get_value, NULL, NULL);
+	2, interfaces_Table_columns, interfaces_Table_get_cell_instance,
+	interfaces_Table_get_next_cell_instance, interfaces_Table_get_value, NULL, NULL);
 
-static const struct snmp_node *const interface_nodes[] = {
-	&interfaces_Number.node.node,
-	&interfaces_Table.node.node
-};
+static const struct snmp_node *const interface_nodes[] = {&interfaces_Number.node.node,
+							  &interfaces_Table.node.node};
 
 const struct snmp_tree_node snmp_mib2_interface_root = SNMP_CREATE_TREE_NODE(2, interface_nodes);
 

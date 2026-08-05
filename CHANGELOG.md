@@ -69,6 +69,20 @@ and this project adheres to
   that this port never populated and so reported zero. Reporting nothing is
   more accurate than reporting a wrong zero; they can return backed by
   `net_stats` and `net_context_foreach()`
+- replace lwIP's short types with the fixed-width names Zephyr uses
+  (`u8_t` becomes `uint8_t` and so on); they had been typedef'd in three
+  places at once. `err_t` becomes plain `int`, keeping the `ERR_*` codes
+- turn `LWIP_ASSERT` into `__ASSERT` and `LWIP_DEBUGF` into `LOG_DBG`. Every
+  assertion guards a caller contract rather than anything a peer can provoke
+- move the public headers from `lwip/apps/` to `snmp/`, since an out-of-tree
+  module should not claim another project's include namespace, and rename
+  `snmp_zephyr.h` to `snmp_agent.h`. `opt.h`, `def.h`, `err.h`, `arch.h`, and
+  `arch/cc.h` collapse into a private `src/snmp_priv.h`
+- fix `snmp_private_call_handler()` reading `prefix[mlength - 1]` when
+  `mlength` was 0, which ran off the front of the string whenever the first
+  character already differed
+- make `oid_names[]` static; it was a global with a name likely to collide
+- apply Zephyr's `.clang-format` and clear checkpatch's errors
 - gate the published groups with `CONFIG_SNMP_AGENT_MIB2_SYSTEM`,
   `CONFIG_SNMP_AGENT_MIB2_INTERFACES`, and `CONFIG_SNMP_AGENT_MIB2_SNMP`
 - back `snmp_pbuf_stream` with a flat buffer cursor and delete `src/pbuf.c`,

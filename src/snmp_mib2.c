@@ -38,17 +38,15 @@
  * @ingroup snmp
  */
 
-#include "lwip/apps/snmp_opts.h"
+#include <snmp/snmp_opts.h>
+#include "snmp_priv.h"
 
 #if LWIP_SNMP && SNMP_LWIP_MIB2 /* don't build if not configured for use in lwipopts.h */
 
-
-#include "lwip/def.h"
-#include "lwip/apps/snmp.h"
-#include "lwip/apps/snmp_core.h"
-#include "lwip/apps/snmp_mib2.h"
-#include "lwip/apps/snmp_scalar.h"
-
+#include <snmp/snmp.h>
+#include <snmp/snmp_core.h>
+#include <snmp/snmp_mib2.h>
+#include <snmp/snmp_scalar.h>
 
 /* The groups this port publishes are the ones it can answer from Zephyr:
  * system, interfaces, and snmp. The ip and udp groups were dropped because
@@ -65,19 +63,19 @@ extern const struct snmp_scalar_array_node snmp_mib2_snmp_root;
 
 static const struct snmp_node *const mib2_nodes[] = {
 #ifdef CONFIG_SNMP_AGENT_MIB2_SYSTEM
-  &snmp_mib2_system_node.node.node,
+	&snmp_mib2_system_node.node.node,
 #endif
 #ifdef CONFIG_SNMP_AGENT_MIB2_INTERFACES
-  &snmp_mib2_interface_root.node,
+	&snmp_mib2_interface_root.node,
 #endif
 #ifdef CONFIG_SNMP_AGENT_MIB2_SNMP
-  &snmp_mib2_snmp_root.node.node,
+	&snmp_mib2_snmp_root.node.node,
 #endif
 };
 
 static const struct snmp_tree_node mib2_root = SNMP_CREATE_TREE_NODE(1, mib2_nodes);
 
-static const u32_t  mib2_base_oid_arr[] = { 1, 3, 6, 1, 2, 1 };
+static const uint32_t mib2_base_oid_arr[] = {1, 3, 6, 1, 2, 1};
 const struct snmp_mib mib2 = SNMP_MIB_CREATE(mib2_base_oid_arr, &mib2_root.node);
 
 #endif /* LWIP_SNMP && SNMP_LWIP_MIB2 */

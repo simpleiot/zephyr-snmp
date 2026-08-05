@@ -1,13 +1,10 @@
 /**
  * @file
- * IANA assigned numbers (RFC 1700 and successors)
- *
- * @defgroup iana IANA assigned numbers
- * @ingroup infrastructure
+ * SNMP MIB2 API
  */
 
 /*
- * Copyright (c) 2017 Dirk Ziegelmeier.
+ * Copyright (c) 2001-2004 Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -37,62 +34,39 @@
  * Author: Dirk Ziegelmeier <dziegel@gmx.de>
  *
  */
+#ifndef LWIP_HDR_APPS_SNMP_MIB2_H
+#define LWIP_HDR_APPS_SNMP_MIB2_H
 
-#ifndef LWIP_HDR_PROT_IANA_H
-#define LWIP_HDR_PROT_IANA_H
+#include <snmp/snmp_opts.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * @ingroup iana
- * Hardware types
- */
-enum lwip_iana_hwtype {
-  /** Ethernet */
-  LWIP_IANA_HWTYPE_ETHERNET = 1
-};
+#if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
+#if SNMP_LWIP_MIB2
 
-/**
- * @ingroup iana
- * Port numbers
- * https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
- */
-enum lwip_iana_port_number {
-  /** SMTP */
-  LWIP_IANA_PORT_SMTP        = 25,
-  /** DHCP server */
-  LWIP_IANA_PORT_DHCP_SERVER = 67,
-  /** DHCP client */
-  LWIP_IANA_PORT_DHCP_CLIENT = 68,
-  /** TFTP */
-  LWIP_IANA_PORT_TFTP        = 69,
-  /** HTTP */
-  LWIP_IANA_PORT_HTTP        = 80,
-  /** SNTP */
-  LWIP_IANA_PORT_SNTP        = 123,
-  /** NETBIOS */
-  LWIP_IANA_PORT_NETBIOS     = 137,
-  /** SNMP */
-  LWIP_IANA_PORT_SNMP        = 161,
-  /** SNMP traps */
-  LWIP_IANA_PORT_SNMP_TRAP   = 162,
-  /** HTTPS */
-  LWIP_IANA_PORT_HTTPS       = 443,
-  /** SMTPS */
-  LWIP_IANA_PORT_SMTPS       = 465,
-  /** MQTT */
-  LWIP_IANA_PORT_MQTT        = 1883,
-  /** MDNS */
-  LWIP_IANA_PORT_MDNS        = 5353,
-  /** Secure MQTT */
-  LWIP_IANA_PORT_SECURE_MQTT = 8883
-};
+#include <snmp/snmp_core.h>
+
+extern const struct snmp_mib mib2;
+
+#ifndef SNMP_SYSSERVICES
+#define SNMP_SYSSERVICES ((1 << 6) | (1 << 3))
+#endif
+
+void snmp_mib2_set_sysdescr(const uint8_t *str, const uint16_t *len); /* read-only be definition */
+void snmp_mib2_set_syscontact(uint8_t *ocstr, uint16_t *ocstrlen, uint16_t bufsize);
+void snmp_mib2_set_syscontact_readonly(const uint8_t *ocstr, const uint16_t *ocstrlen);
+void snmp_mib2_set_sysname(uint8_t *ocstr, uint16_t *ocstrlen, uint16_t bufsize);
+void snmp_mib2_set_sysname_readonly(const uint8_t *ocstr, const uint16_t *ocstrlen);
+void snmp_mib2_set_syslocation(uint8_t *ocstr, uint16_t *ocstrlen, uint16_t bufsize);
+void snmp_mib2_set_syslocation_readonly(const uint8_t *ocstr, const uint16_t *ocstrlen);
+
+#endif /* SNMP_LWIP_MIB2 */
+#endif /* LWIP_SNMP */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* LWIP_HDR_PROT_IANA_H */
-
+#endif /* LWIP_HDR_APPS_SNMP_MIB2_H */

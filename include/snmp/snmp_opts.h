@@ -37,7 +37,10 @@
 #ifndef LWIP_HDR_SNMP_OPTS_H
 #define LWIP_HDR_SNMP_OPTS_H
 
-#include "lwip/opt.h"
+#include <stddef.h>
+#include <stdint.h>
+
+#include <zephyr/sys/util.h>
 
 /**
  * @defgroup snmp_opts Options
@@ -53,15 +56,13 @@
  * LWIP_MIB2_CALLBACKS and MIB2_STATS. This will give you the callbacks
  * and statistics counters you need to get MIB2 working.
  */
-#if !defined LWIP_SNMP || defined __DOXYGEN__
-#define LWIP_SNMP                       0
-#endif
+#define LWIP_SNMP 1
 
 /**
  * SNMP_TRAP_DESTINATIONS: Number of trap destinations. At least one trap
  * destination is required
  */
-#define SNMP_TRAP_DESTINATIONS          CONFIG_SNMP_AGENT_TRAP_DESTINATIONS
+#define SNMP_TRAP_DESTINATIONS CONFIG_SNMP_AGENT_TRAP_DESTINATIONS
 
 /**
  * Only allow SNMP write actions that are 'safe' (e.g. disabling netifs is not
@@ -69,14 +70,14 @@
  * Unsafe requests are disabled by default!
  */
 #if !defined SNMP_SAFE_REQUESTS || defined __DOXYGEN__
-#define SNMP_SAFE_REQUESTS              1
+#define SNMP_SAFE_REQUESTS 1
 #endif
 
 /**
  * The maximum length of strings used.
  */
 #if !defined SNMP_MAX_OCTET_STRING_LEN || defined __DOXYGEN__
-#define SNMP_MAX_OCTET_STRING_LEN       127
+#define SNMP_MAX_OCTET_STRING_LEN 127
 #endif
 
 /**
@@ -84,18 +85,22 @@
  * Indirectly this also limits the maximum depth of SNMP tree.
  */
 #if !defined SNMP_MAX_OBJ_ID_LEN || defined __DOXYGEN__
-#define SNMP_MAX_OBJ_ID_LEN             50
+#define SNMP_MAX_OBJ_ID_LEN 50
 #endif
 
 #if !defined SNMP_MAX_VALUE_SIZE || defined __DOXYGEN__
 /**
  * The minimum size of a value.
  */
-#define SNMP_MIN_VALUE_SIZE             (2 * sizeof(u32_t*)) /* size required to store the basic types (8 bytes for counter64) */
+#define SNMP_MIN_VALUE_SIZE                                                                        \
+	(2 *                                                                                       \
+	 sizeof(uint32_t *)) /* size required to store the basic types (8 bytes for counter64) */
 /**
  * The maximum size of a value.
  */
-#define SNMP_MAX_VALUE_SIZE             LWIP_MAX(LWIP_MAX((SNMP_MAX_OCTET_STRING_LEN), sizeof(u32_t)*(SNMP_MAX_OBJ_ID_LEN)), SNMP_MIN_VALUE_SIZE)
+#define SNMP_MAX_VALUE_SIZE                                                                        \
+	MAX(MAX((SNMP_MAX_OCTET_STRING_LEN), sizeof(uint32_t) * (SNMP_MAX_OBJ_ID_LEN)),            \
+	    SNMP_MIN_VALUE_SIZE)
 #endif
 
 /**
@@ -103,7 +108,7 @@
  * unless SNMP_COMMUNITY_WRITE or SNMP_COMMUNITY_TRAP are enabled, respectively.
  */
 #if !defined SNMP_COMMUNITY || defined __DOXYGEN__
-#define SNMP_COMMUNITY                  "public"
+#define SNMP_COMMUNITY "public"
 #endif
 
 /**
@@ -111,14 +116,14 @@
  * Set this community to "" in order to disallow any write access.
  */
 #if !defined SNMP_COMMUNITY_WRITE || defined __DOXYGEN__
-#define SNMP_COMMUNITY_WRITE            "private"
+#define SNMP_COMMUNITY_WRITE "private"
 #endif
 
 /**
  * The snmp community used for sending traps.
  */
 #if !defined SNMP_COMMUNITY_TRAP || defined __DOXYGEN__
-#define SNMP_COMMUNITY_TRAP             "public"
+#define SNMP_COMMUNITY_TRAP "public"
 #endif
 
 /**
@@ -127,14 +132,16 @@
  * enter here the possible maximum length (+1 for terminating null character).
  */
 #if !defined SNMP_MAX_COMMUNITY_STR_LEN || defined __DOXYGEN__
-#define SNMP_MAX_COMMUNITY_STR_LEN LWIP_MAX(LWIP_MAX(sizeof(SNMP_COMMUNITY), sizeof(SNMP_COMMUNITY_WRITE)), sizeof(SNMP_COMMUNITY_TRAP))
+#define SNMP_MAX_COMMUNITY_STR_LEN                                                                 \
+	MAX(MAX(sizeof(SNMP_COMMUNITY), sizeof(SNMP_COMMUNITY_WRITE)), sizeof(SNMP_COMMUNITY_TRAP))
 #endif
 
 /**
- * The OID identifiying the device. This may be the enterprise OID itself or any OID located below it in tree.
+ * The OID identifiying the device. This may be the enterprise OID itself or any OID located below
+ * it in tree.
  */
 #if !defined SNMP_DEVICE_ENTERPRISE_OID || defined __DOXYGEN__
-#define SNMP_LWIP_ENTERPRISE_OID 62530
+#define SNMP_LWIP_ENTERPRISE_OID       62530
 /**
  * IANA assigned enterprise ID for lwIP is 62530
  * @see http://www.iana.org/assignments/enterprise-numbers
@@ -148,7 +155,7 @@
  * to apply for your own enterprise ID with IANA:
  * http://www.iana.org/numbers.html
  */
-#define SNMP_DEVICE_ENTERPRISE_OID {1, 3, 6, 1, 4, 1, SNMP_LWIP_ENTERPRISE_OID}
+#define SNMP_DEVICE_ENTERPRISE_OID     {1, 3, 6, 1, 4, 1, SNMP_LWIP_ENTERPRISE_OID}
 /**
  * Length of SNMP_DEVICE_ENTERPRISE_OID
  */
@@ -159,28 +166,28 @@
  * SNMP_DEBUG: Enable debugging for SNMP messages.
  */
 #if !defined SNMP_DEBUG || defined __DOXYGEN__
-#define SNMP_DEBUG                      LWIP_DBG_OFF
+#define SNMP_DEBUG 0
 #endif
 
 /**
  * SNMP_MIB_DEBUG: Enable debugging for SNMP MIBs.
  */
 #if !defined SNMP_MIB_DEBUG || defined __DOXYGEN__
-#define SNMP_MIB_DEBUG                  LWIP_DBG_OFF
+#define SNMP_MIB_DEBUG 0
 #endif
 
 /**
  * Indicates if the MIB2 implementation of LWIP SNMP stack is used.
  */
 #if !defined SNMP_LWIP_MIB2 || defined __DOXYGEN__
-#define SNMP_LWIP_MIB2                      LWIP_SNMP
+#define SNMP_LWIP_MIB2 1
 #endif
 
 /**
  * Value return for sysDesc field of MIB2.
  */
 #if !defined SNMP_LWIP_MIB2_SYSDESC || defined __DOXYGEN__
-#define SNMP_LWIP_MIB2_SYSDESC              "sysDesc"
+#define SNMP_LWIP_MIB2_SYSDESC "sysDesc"
 #endif
 
 /**
@@ -188,32 +195,35 @@
  * To make sysName field settable, call snmp_mib2_set_sysname() to provide the necessary buffers.
  */
 #if !defined SNMP_LWIP_MIB2_SYSNAME || defined __DOXYGEN__
-#define SNMP_LWIP_MIB2_SYSNAME              "sysName"
+#define SNMP_LWIP_MIB2_SYSNAME "sysName"
 #endif
 
 /**
  * Value return for sysContact field of MIB2.
- * To make sysContact field settable, call snmp_mib2_set_syscontact() to provide the necessary buffers.
+ * To make sysContact field settable, call snmp_mib2_set_syscontact() to provide the necessary
+ * buffers.
  */
 #if !defined SNMP_LWIP_MIB2_SYSCONTACT || defined __DOXYGEN__
-#define SNMP_LWIP_MIB2_SYSCONTACT           "sysContact"
+#define SNMP_LWIP_MIB2_SYSCONTACT "sysContact"
 #endif
 
 /**
  * Value return for sysLocation field of MIB2.
- * To make sysLocation field settable, call snmp_mib2_set_syslocation() to provide the necessary buffers.
+ * To make sysLocation field settable, call snmp_mib2_set_syslocation() to provide the necessary
+ * buffers.
  */
 #if !defined SNMP_LWIP_MIB2_SYSLOCATION || defined __DOXYGEN__
-#define SNMP_LWIP_MIB2_SYSLOCATION          "sysLocation"
+#define SNMP_LWIP_MIB2_SYSLOCATION "sysLocation"
 #endif
 
 /**
- * This value is used to limit the repetitions processed in GetBulk requests (value == 0 means no limitation).
- * This may be useful to limit the load for a single request.
- * According to SNMP RFC 1905 it is allowed to not return all requested variables from a GetBulk request if system load would be too high.
- * so the effect is that the client will do more requests to gather all data.
- * For the stack this could be useful in case that SNMP processing is done in TCP/IP thread. In this situation a request with many
- * repetitions could block the thread for a longer time. Setting limit here will keep the stack more responsive.
+ * This value is used to limit the repetitions processed in GetBulk requests (value == 0 means no
+ * limitation). This may be useful to limit the load for a single request. According to SNMP RFC
+ * 1905 it is allowed to not return all requested variables from a GetBulk request if system load
+ * would be too high. so the effect is that the client will do more requests to gather all data. For
+ * the stack this could be useful in case that SNMP processing is done in TCP/IP thread. In this
+ * situation a request with many repetitions could block the thread for a longer time. Setting limit
+ * here will keep the stack more responsive.
  */
 #if !defined SNMP_LWIP_GETBULK_MAX_REPETITIONS || defined __DOXYGEN__
 #define SNMP_LWIP_GETBULK_MAX_REPETITIONS 0

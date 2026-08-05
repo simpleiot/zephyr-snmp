@@ -44,8 +44,9 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/socket_service.h>
 
-#include <lwip/apps/snmp_opts.h>
-#include <lwip/apps/snmp_zephyr.h>
+#include <snmp/snmp_opts.h>
+#include "snmp_priv.h"
+#include <snmp/snmp_agent.h>
 
 #include "snmp_lock.h"
 #include "snmp_msg.h"
@@ -67,7 +68,7 @@ static int agent_sock = -1;
 /** Guarded by agent_lock, so one buffer serves every request. */
 static uint8_t recv_buf[CONFIG_SNMP_AGENT_MAX_MSG_SIZE];
 
-static struct zsock_pollfd agent_fds[1] = { { .fd = -1 } };
+static struct zsock_pollfd agent_fds[1] = {{.fd = -1}};
 
 void snmp_agent_lock(void)
 {
@@ -114,8 +115,7 @@ static void snmp_service_cb(struct net_socket_service_event *evt)
 		goto unlock;
 	}
 
-	ret = zsock_recvfrom(evt->event.fd, recv_buf, sizeof(recv_buf),
-			     ZSOCK_MSG_DONTWAIT,
+	ret = zsock_recvfrom(evt->event.fd, recv_buf, sizeof(recv_buf), ZSOCK_MSG_DONTWAIT,
 			     (struct net_sockaddr *)&from, &fromlen);
 	if (ret < 0) {
 		if (errno != EAGAIN) {
@@ -142,7 +142,7 @@ static void snmp_service_cb(struct net_socket_service_event *evt)
 		/* The socket is passed as an opaque handle because that is
 		 * what the agent core hands back to snmp_sendto() when it
 		 * wants to reply. */
-		snmp_receive((void *)(intptr_t)evt->event.fd, recv_buf, (u16_t)ret,
+		snmp_receive((void *)(intptr_t)evt->event.fd, recv_buf, (uint16_t)ret,
 			     &from_address, from.sin_port);
 	}
 
@@ -150,8 +150,7 @@ unlock:
 	snmp_agent_unlock();
 }
 
-NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(snmp_service, snmp_service_cb,
-				      ARRAY_SIZE(agent_fds));
+NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(snmp_service, snmp_service_cb, ARRAY_SIZE(agent_fds));
 
 int net_snmp_agent_start(void)
 {
@@ -188,8 +187,7 @@ int net_snmp_agent_start(void)
 	agent_fds[0].fd = sock;
 	agent_fds[0].events = ZSOCK_POLLIN;
 
-	ret = net_socket_service_register(&snmp_service, agent_fds,
-					  ARRAY_SIZE(agent_fds), NULL);
+	ret = net_socket_service_register(&snmp_service, agent_fds, ARRAY_SIZE(agent_fds), NULL);
 	if (ret < 0) {
 		LOG_ERR("cannot register the socket service, %d", ret);
 		agent_fds[0].fd = -1;
@@ -259,7 +257,6 @@ int net_snmp_agent_trap_dst_set(const char *ip_address)
 		return -EINVAL;
 	}
 
-
 	snmp_agent_lock();
 	snmp_set_default_trap_version(SNMP_VERSION_2c);
 	snmp_trap_dst_enable(0, true);
@@ -278,8 +275,8 @@ int net_snmp_agent_trap_dst_set(const char *ip_address)
  * @param dst    Destination address.
  * @param port   Destination port, in network byte order.
  */
-err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const struct net_in_addr *dst,
-		  u16_t port)
+int snmp_sendto(void *handle, const uint8_t *data, uint16_t len, const struct net_in_addr *dst,
+		uint16_t port)
 {
 	struct net_sockaddr_in to = {
 		.sin_family = NET_AF_INET,
@@ -290,8 +287,7 @@ err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const struct net_in
 
 	to.sin_addr = *dst;
 
-	ret = zsock_sendto(sock, data, len, 0,
-			   (struct net_sockaddr *)&to, sizeof(to));
+	ret = zsock_sendto(sock, data, len, 0, (struct net_sockaddr *)&to, sizeof(to));
 	if (ret < 0) {
 		LOG_ERR("sendto failed, errno %d", errno);
 		return ERR_CONN;
@@ -300,7 +296,8 @@ err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const struct net_in
 	return ERR_OK;
 }
 
-u8_t snmp_get_local_ip_for_dst(void *handle, const struct net_in_addr *dst, struct net_in_addr *result)
+uint8_t snmp_get_local_ip_for_dst(void *handle, const struct net_in_addr *dst,
+				  struct net_in_addr *result)
 {
 	(void)handle;
 
@@ -309,13 +306,12 @@ u8_t snmp_get_local_ip_for_dst(void *handle, const struct net_in_addr *dst, stru
 	return 1;
 }
 
-u32_t sys_now(void)
+uint32_t sys_now(void)
 {
 	return k_uptime_get();
 }
 
-const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len,
-			    const u32_t *oid_words)
+const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len, const uint32_t *oid_words)
 {
 	size_t count = (oid_len <= SNMP_MAX_OBJ_ID_LEN) ? oid_len : SNMP_MAX_OBJ_ID_LEN;
 	size_t length = 0;
@@ -328,8 +324,7 @@ const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len,
 	buf[0] = '\0';
 
 	for (index = 0; index < count && length < buf_size - 1; index++) {
-		int written = snprintf(buf + length, buf_size - length,
-				       (index == 0) ? "%u" : ".%u",
+		int written = snprintf(buf + length, buf_size - length, (index == 0) ? "%u" : ".%u",
 				       (unsigned)oid_words[index]);
 
 		if (written < 0) {
