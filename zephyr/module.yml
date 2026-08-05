@@ -2,3 +2,5 @@ name: snmp
 build:
   cmake: .
   kconfig: Kconfig
+samples:
+  - samples
