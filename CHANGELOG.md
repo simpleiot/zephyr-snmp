@@ -8,6 +8,14 @@ and this project adheres to
 
 ## [unreleased]
 
+- demonstrate writes in samples/agent: the sample installs a write callback
+  and prints each value a manager changes, and prints the `snmpset` command
+  to try on startup. The sample README covers which objects are writable and
+  why, the write community that guards them, and what a manager sees when it
+  uses the wrong one
+- document writable objects in the README, under a new "Reacting to writes"
+  section covering `snmp_set_write_callback()`, and record what a community
+  mismatch does alongside the community strings
 - clear every checkpatch finding across the sources and make the continuous
   integration step fail when new ones appear, rather than reporting them and
   passing. The changes are style only: block comments, blank lines after

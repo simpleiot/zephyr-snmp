@@ -183,6 +183,49 @@ snmp_set_community_write("plant-floor-rw");
 snmp_set_community_trap("plant-floor");
 ```
 
+A request whose community does not match is discarded without a reply, so a
+manager sees a timeout rather than an error. The agent counts it in
+`snmpInBadCommunityNames` and, once
+`snmp_set_auth_traps_enabled(SNMP_AUTH_TRAPS_ENABLED)` has been called,
+sends an authentication failure trap. Setting the write community to `""`
+makes every object read-only.
+
+### Reacting to writes
+
+An object becomes writable when it is registered with the size of the buffer
+behind it, as `snmp_mib2_set_sysname()` and its companions are above. The
+agent copies the new value into that buffer, then calls the application back
+so it can act on the change:
+
+```c
+#include <snmp/snmp.h>
+
+static const uint32_t sys_location_oid[] = {1, 3, 6, 1, 2, 1, 1, 6, 0};
+
+static void value_written(const uint32_t *oid, uint8_t oid_len, void *callback_arg)
+{
+	if ((oid_len == ARRAY_SIZE(sys_location_oid)) &&
+	    (memcmp(oid, sys_location_oid, sizeof(sys_location_oid)) == 0)) {
+		settings_save_one("device/location", sys_location, sys_location_len);
+	}
+}
+
+snmp_set_write_callback(value_written, NULL);
+```
+
+The callback receives the OID rather than the value, so the application
+looks at whichever variable that OID stands for. It runs once per variable
+binding, after the write has been applied, on the thread that handled the
+request, which is the socket service thread. Writes to objects the agent
+implements itself reach it too, so match the OIDs that matter and ignore the
+rest.
+
+A request that writes several objects either applies all of them or none:
+the agent tests every variable binding before committing any, and answers
+with an error such as `notWritable` or `wrongType` if one fails. A value too
+long for the buffer it would be stored in is rejected the same way, so size
+each buffer for the longest value a manager should be able to write.
+
 ### Serving a value with a callback
 
 Callbacks are the lightest way to attach live data to an OID. Each entry

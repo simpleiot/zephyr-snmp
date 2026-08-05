@@ -39,6 +39,59 @@ addressing, `CONFIG_NET_CONFIG_*` has no effect here.
 To exercise the interfaces group against Zephyr's own stack, use the TAP
 interface described below.
 
+## Setting values
+
+`sysName`, `sysLocation` and `sysContact` are writable, because
+`snmp_describe_device()` registers each of them with the size of its buffer.
+`sysDescr` passes no buffer size and stays read-only.
+
+Writes are checked against the write community, which is a different string
+from the one reads use and defaults to `private`:
+
+```sh
+snmpset -v2c -c private localhost:1161 1.3.6.1.2.1.1.6.0 s "rack 4"
+snmpget -v2c -c public  localhost:1161 1.3.6.1.2.1.1.6.0
+```
+
+A request carrying the wrong community is discarded without a reply, which
+is what RFC 1157 asks for, so `snmpset -c public` reports a timeout rather
+than an error. The agent counts the attempt in `snmpInBadCommunityNames`:
+
+```sh
+snmpget -v2c -c public localhost:1161 1.3.6.1.2.1.11.4.0
+```
+
+It also sends an authentication failure trap, though only once those are
+enabled. They are off until the application calls
+`snmp_set_auth_traps_enabled(SNMP_AUTH_TRAPS_ENABLED)` or a manager writes
+`snmpEnableAuthenTraps`. `snmp_set_community_write()` changes the write
+community, and setting it to `""` makes every object read-only.
+
+The sample installs a write callback, so it prints each value a manager
+changes:
+
+```
+SNMP: sysLocation is now 'rack 4'
+```
+
+The agent copies the new value into the application's buffer before calling
+back, which is where a real device would persist it. The callback receives
+the OID rather than the value, so the application looks at whichever
+variable that OID stands for. It runs once per variable binding, on the
+socket service thread that handled the request.
+
+Objects the agent implements itself are writable too. The callback still
+runs for them, so an application that only tracks its own variables needs a
+final branch for the rest:
+
+```sh
+snmpset -v2c -c private localhost:1161 1.3.6.1.2.1.11.30.0 i 2   # disable authen traps
+```
+
+Writing a read-only object returns `notWritable` and changes nothing. When
+one variable binding in a request fails, none of them are applied: the agent
+tests every binding before committing any.
+
 ## Receiving traps
 
 The sample sends a cold start trap once the agent is running, then an
