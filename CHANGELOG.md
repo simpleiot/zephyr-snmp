@@ -20,9 +20,9 @@ and this project adheres to
   local array and then putting the old value back, which published the
   address of a stack frame into memory the application owns and cleared that
   pointer outright when the trap OID could not be prepared. Varbind lists are
-  only ever walked forward, so the backward link is not needed and is no
-  longer written; `struct snmp_varbind` keeps the `prev` field for source
-  compatibility, and the agent never reads it
+  only ever walked forward, so `struct snmp_varbind` loses its `prev` field
+  entirely. Applications that fill a varbind field by field need no change;
+  those using positional initializers drop the second element
 - add SPDX identifiers throughout, keeping the lwIP copyright blocks that the
   BSD-3-Clause license requires, and give the public headers Zephyr-style
   include guards

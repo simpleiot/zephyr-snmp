@@ -393,7 +393,6 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 		/* First varbind is used to store sysUpTime */
 		{
 			NULL, /* *next */
-			NULL, /* *prev */
 			{
 				/* oid */
 				9, /* oid len */
@@ -413,7 +412,6 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 		 */
 		{
 			NULL, /* *next */
-			NULL, /* *prev */
 			{
 				/* oid */
 				11, /* oid len */
@@ -439,10 +437,11 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 			snmp_v2_special_varbinds[1].value_len =
 				snmp_trap_oid.len * sizeof(snmp_trap_oid.id[0]);
 			snmp_v2_special_varbinds[1].object_value = snmp_trap_oid.id;
-			/* The two special varbinds now head the list the caller
-			 * supplied. Only the forward links are set: the caller's
-			 * varbinds keep whatever prev they arrived with, so no
-			 * address of this stack frame escapes the function.
+			/* The two special varbinds now head the list the
+			 * caller supplied, linked to it in the forward
+			 * direction only. Nothing writes to the caller's
+			 * varbinds, so no address of this stack frame
+			 * escapes the function.
 			 */
 			varbinds = snmp_v2_special_varbinds;
 		}
