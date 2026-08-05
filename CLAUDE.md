@@ -42,7 +42,7 @@ stack, so no TAP interface and no root are needed:
 ```sh
 west build -b native_sim samples/agent -- -DEXTRA_CONF_FILE=overlay-host.conf
 ./build/zephyr/zephyr.exe &
-snmpwalk -v2c -c public 127.0.0.1:1161 1
+snmpwalk -v2c -c public localhost:1161 1
 ```
 
 Diff a full walk before and after any change that is not meant to alter what

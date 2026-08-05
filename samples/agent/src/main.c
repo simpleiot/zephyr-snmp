@@ -16,6 +16,20 @@
 #include <snmp/snmp_mib2.h>
 #include <snmp/snmp_agent.h>
 
+/*
+ * Where to point a manager depends on how the sample was built. With
+ * offloaded sockets the agent listens on the host's own stack; otherwise it
+ * listens on the Zephyr interface configured in prj.conf.
+ */
+#if defined(CONFIG_NET_NATIVE_OFFLOADED_SOCKETS)
+#define SAMPLE_QUERY_ADDR "localhost"
+#elif defined(CONFIG_NET_CONFIG_MY_IPV4_ADDR)
+#define SAMPLE_QUERY_ADDR CONFIG_NET_CONFIG_MY_IPV4_ADDR
+#else
+/* The address arrives at runtime, from DHCP or the application. */
+#define SAMPLE_QUERY_ADDR "<this device>"
+#endif
+
 /* MIB-2 system group: describe this device. */
 static const uint8_t sys_descr[] = "zephyr-snmp sample agent";
 static const uint16_t sys_descr_len = sizeof(sys_descr) - 1;
@@ -52,7 +66,8 @@ int main(void)
 	}
 
 	printk("zephyr-snmp sample: query me with "
-	       "'snmpwalk -v2c -c public 192.0.2.1 1'\n");
+	       "'snmpwalk -v2c -c public " SAMPLE_QUERY_ADDR ":%d 1'\n",
+	       CONFIG_SNMP_AGENT_PORT);
 
 	return 0;
 }

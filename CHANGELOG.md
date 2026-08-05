@@ -8,6 +8,16 @@ and this project adheres to
 
 ## [unreleased]
 
+- make the host network stack the documented default for running the sample on
+  native_sim, since it needs neither root nor a TAP interface, and describe the
+  zeth route as the alternative for exercising the interfaces group against
+  Zephyr's own stack
+- print the address the sample is actually reachable at on startup. It always
+  named 192.0.2.1 on port 161, which was wrong whenever the agent was built
+  with `overlay-host.conf` or a non-default port
+- stop creating the zeth TAP interface in `overlay-host.conf` builds. Nothing
+  reaches the network through it once sockets are offloaded, so it only logged
+  a failure to create it at boot; `ifNumber` in that configuration is now 1
 - fix the SNMPv2c trap OID, which named the wrong notification: for a generic
   trap the last sub-identifier was built from the specific-trap parameter,
   which `snmp_send_trap_generic()` always passes as 0, so every generic trap
