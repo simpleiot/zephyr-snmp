@@ -40,7 +40,6 @@
  */
 
 #include "lwip/def.h"
-#include "lwip/snmp.h"
 #include "lwip/apps/snmp.h"
 #include "lwip/apps/snmp_core.h"
 #include "lwip/apps/snmp_mib2.h"

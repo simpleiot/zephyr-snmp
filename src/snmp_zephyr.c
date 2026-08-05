@@ -47,9 +47,6 @@
 #include <lwip/apps/snmp_opts.h>
 #include <lwip/apps/snmp_zephyr.h>
 
-#include "lwip/ip.h"
-#include "lwip/sys.h"
-#include "lwip/udp.h"
 #include "snmp_lock.h"
 #include "snmp_msg.h"
 
@@ -140,9 +137,7 @@ static void snmp_service_cb(struct net_socket_service_event *evt)
 	}
 
 	{
-		ip_addr_t from_address;
-
-		from_address.addr = from.sin_addr.s_addr;
+		struct net_in_addr from_address = from.sin_addr;
 
 		/* The socket is passed as an opaque handle because that is
 		 * what the agent core hands back to snmp_sendto() when it
@@ -251,21 +246,19 @@ unlock:
 
 int net_snmp_agent_trap_dst_set(const char *ip_address)
 {
-	struct net_in_addr addr;
-	ip_addr_t dst;
+	struct net_in_addr dst;
 	int ret;
 
 	if (ip_address == NULL) {
 		return -EINVAL;
 	}
 
-	ret = net_addr_pton(NET_AF_INET, ip_address, &addr);
+	ret = net_addr_pton(NET_AF_INET, ip_address, &dst);
 	if (ret < 0) {
 		LOG_ERR("cannot parse trap destination \"%s\"", ip_address);
 		return -EINVAL;
 	}
 
-	dst.addr = addr.s_addr;
 
 	snmp_agent_lock();
 	snmp_set_default_trap_version(SNMP_VERSION_2c);
@@ -285,7 +278,7 @@ int net_snmp_agent_trap_dst_set(const char *ip_address)
  * @param dst    Destination address.
  * @param port   Destination port, in network byte order.
  */
-err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const ip_addr_t *dst,
+err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const struct net_in_addr *dst,
 		  u16_t port)
 {
 	struct net_sockaddr_in to = {
@@ -295,7 +288,7 @@ err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const ip_addr_t *ds
 	int sock = (int)(intptr_t)handle;
 	int ret;
 
-	to.sin_addr.s_addr = dst->addr;
+	to.sin_addr = *dst;
 
 	ret = zsock_sendto(sock, data, len, 0,
 			   (struct net_sockaddr *)&to, sizeof(to));
@@ -307,11 +300,11 @@ err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const ip_addr_t *ds
 	return ERR_OK;
 }
 
-u8_t snmp_get_local_ip_for_dst(void *handle, const ip_addr_t *dst, ip_addr_t *result)
+u8_t snmp_get_local_ip_for_dst(void *handle, const struct net_in_addr *dst, struct net_in_addr *result)
 {
 	(void)handle;
 
-	ip_addr_copy(*result, *dst);
+	*result = *dst;
 
 	return 1;
 }
@@ -353,21 +346,3 @@ const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len,
 
 	return buf;
 }
-
-/* Link stubs for lwIP globals the MIB-2 groups still reference. They are
- * never populated in this port; the groups that read them are rewritten
- * against Zephyr's own interfaces in a later phase. */
-
-const ip_addr_t ip_addr_any;
-
-/** udp_pcbs export for external reference (e.g. SNMP agent) */
-struct udp_pcb *udp_pcbs;
-
-/** Global variable containing lwIP internal statistics. */
-struct stats_ lwip_stats;
-
-/** Global variable containing the list of network interfaces. */
-struct netif *netif_list;
-
-/** The default network interface. */
-struct netif *netif_default;

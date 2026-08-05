@@ -76,6 +76,12 @@ and this project adheres to
   into static buffers of `CONFIG_SNMP_AGENT_MAX_MSG_SIZE` bytes, one for
   responses and one for traps, so nothing is allocated per packet and
   `CONFIG_HEAP_MEM_POOL_SIZE` is no longer required
+- use `struct net_in_addr` in place of lwIP's `ip_addr_t` and `ip4_addr_t`,
+  including in the public `snmp_trap_dst_ip_set()` and the OID conversion
+  helpers, and delete `lwip/ip_addr.h`, `ip4_addr.h`, `ip6_addr.h`, `ip.h`,
+  `netif.h`, `udp.h`, `stats.h`, `sys.h`, `snmp.h`, and `arch/sys_arch.h`
+  along with the never-populated `netif_list`, `udp_pcbs`, and `lwip_stats`
+  globals that stood in for them
 
 ## [v0.0.6] - 2025-05-08
 

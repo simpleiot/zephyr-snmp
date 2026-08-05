@@ -33,13 +33,12 @@
  *         Christiaan Simons <christiaan.simons@axon.tv>
  */
 
-#include "lwip/snmp.h"
 #include "lwip/apps/snmp.h"
+#include "lwip/def.h"
 #include "lwip/apps/snmp_core.h"
 #include "lwip/apps/snmp_mib2.h"
 #include "lwip/apps/snmp_table.h"
 #include "lwip/apps/snmp_scalar.h"
-#include "lwip/sys.h"
 
 #include <string.h>
 #include "snmp_lock.h"

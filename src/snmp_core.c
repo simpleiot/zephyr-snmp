@@ -193,7 +193,6 @@ LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 #include "lwip/apps/snmp_core.h"
 #include "lwip/apps/snmp_scalar.h"
 #include "snmp_core_priv.h"
-#include "lwip/netif.h"
 #include <string.h>
 
 
@@ -287,106 +286,45 @@ const struct snmp_obj_id *snmp_get_device_enterprise_oid(void)
   return oid;
 }
 
-#if LWIP_IPV4
 /**
- * Conversion from InetAddressIPv4 oid to lwIP ip4_addr
+ * Conversion from InetAddressIPv4 oid to an IPv4 address
  * @param oid points to u32_t ident[4] input
  * @param ip points to output struct
  */
 u8_t
-snmp_oid_to_ip4(const u32_t *oid, ip4_addr_t *ip)
+snmp_oid_to_ip4(const u32_t *oid, struct net_in_addr *ip)
 {
   if ((oid[0] > 0xFF) ||
       (oid[1] > 0xFF) ||
       (oid[2] > 0xFF) ||
       (oid[3] > 0xFF)) {
-    ip4_addr_copy(*ip, *IP4_ADDR_ANY4);
+    ip->s_addr = 0;
     return 0;
   }
 
-  IP4_ADDR(ip, oid[0], oid[1], oid[2], oid[3]);
+  /* InetAddressIPv4 is most significant octet first, which is also how the
+     address is held on the wire. */
+  ip->s_addr = net_htonl(((u32_t)oid[0] << 24) | ((u32_t)oid[1] << 16) |
+                         ((u32_t)oid[2] <<  8) |  (u32_t)oid[3]);
   return 1;
 }
 
 /**
- * Convert ip4_addr to InetAddressIPv4 (no InetAddressType)
+ * Convert an IPv4 address to InetAddressIPv4 (no InetAddressType)
  * @param ip points to input struct
  * @param oid points to u32_t ident[4] output
  */
 void
-snmp_ip4_to_oid(const ip4_addr_t *ip, u32_t *oid)
+snmp_ip4_to_oid(const struct net_in_addr *ip, u32_t *oid)
 {
-  oid[0] = ip4_addr1(ip);
-  oid[1] = ip4_addr2(ip);
-  oid[2] = ip4_addr3(ip);
-  oid[3] = ip4_addr4(ip);
-}
-#endif /* LWIP_IPV4 */
+  u32_t addr = net_ntohl(ip->s_addr);
 
-#if LWIP_IPV6
-/**
- * Conversion from InetAddressIPv6 oid to lwIP ip6_addr
- * @param oid points to u32_t oid[16] input
- * @param ip points to output struct
- */
-u8_t
-snmp_oid_to_ip6(const u32_t *oid, ip6_addr_t *ip)
-{
-  if ((oid[0]  > 0xFF) ||
-      (oid[1]  > 0xFF) ||
-      (oid[2]  > 0xFF) ||
-      (oid[3]  > 0xFF) ||
-      (oid[4]  > 0xFF) ||
-      (oid[5]  > 0xFF) ||
-      (oid[6]  > 0xFF) ||
-      (oid[7]  > 0xFF) ||
-      (oid[8]  > 0xFF) ||
-      (oid[9]  > 0xFF) ||
-      (oid[10] > 0xFF) ||
-      (oid[11] > 0xFF) ||
-      (oid[12] > 0xFF) ||
-      (oid[13] > 0xFF) ||
-      (oid[14] > 0xFF) ||
-      (oid[15] > 0xFF)) {
-    ip6_addr_set_any(ip);
-    return 0;
-  }
-
-  ip->addr[0] = (oid[0]  << 24) | (oid[1]  << 16) | (oid[2]  << 8) | (oid[3]  << 0);
-  ip->addr[1] = (oid[4]  << 24) | (oid[5]  << 16) | (oid[6]  << 8) | (oid[7]  << 0);
-  ip->addr[2] = (oid[8]  << 24) | (oid[9]  << 16) | (oid[10] << 8) | (oid[11] << 0);
-  ip->addr[3] = (oid[12] << 24) | (oid[13] << 16) | (oid[14] << 8) | (oid[15] << 0);
-  return 1;
+  oid[0] = (addr >> 24) & 0xFF;
+  oid[1] = (addr >> 16) & 0xFF;
+  oid[2] = (addr >>  8) & 0xFF;
+  oid[3] =  addr        & 0xFF;
 }
 
-/**
- * Convert ip6_addr to InetAddressIPv6 (no InetAddressType)
- * @param ip points to input struct
- * @param oid points to u32_t ident[16] output
- */
-void
-snmp_ip6_to_oid(const ip6_addr_t *ip, u32_t *oid)
-{
-  oid[0]  = (ip->addr[0] & 0xFF000000) >> 24;
-  oid[1]  = (ip->addr[0] & 0x00FF0000) >> 16;
-  oid[2]  = (ip->addr[0] & 0x0000FF00) >>  8;
-  oid[3]  = (ip->addr[0] & 0x000000FF) >>  0;
-  oid[4]  = (ip->addr[1] & 0xFF000000) >> 24;
-  oid[5]  = (ip->addr[1] & 0x00FF0000) >> 16;
-  oid[6]  = (ip->addr[1] & 0x0000FF00) >>  8;
-  oid[7]  = (ip->addr[1] & 0x000000FF) >>  0;
-  oid[8]  = (ip->addr[2] & 0xFF000000) >> 24;
-  oid[9]  = (ip->addr[2] & 0x00FF0000) >> 16;
-  oid[10] = (ip->addr[2] & 0x0000FF00) >>  8;
-  oid[11] = (ip->addr[2] & 0x000000FF) >>  0;
-  oid[12] = (ip->addr[3] & 0xFF000000) >> 24;
-  oid[13] = (ip->addr[3] & 0x00FF0000) >> 16;
-  oid[14] = (ip->addr[3] & 0x0000FF00) >>  8;
-  oid[15] = (ip->addr[3] & 0x000000FF) >>  0;
-}
-#endif /* LWIP_IPV6 */
-
-#if LWIP_IPV4 || LWIP_IPV6
 /**
  * Convert to InetAddressType+InetAddress+InetPortNumber
  * @param ip IP address
@@ -395,7 +333,7 @@ snmp_ip6_to_oid(const ip6_addr_t *ip, u32_t *oid)
  * @return OID length
  */
 u8_t
-snmp_ip_port_to_oid(const ip_addr_t *ip, u16_t port, u32_t *oid)
+snmp_ip_port_to_oid(const struct net_in_addr *ip, u16_t port, u32_t *oid)
 {
   u8_t idx;
 
@@ -413,42 +351,30 @@ snmp_ip_port_to_oid(const ip_addr_t *ip, u16_t port, u32_t *oid)
  * @return OID length
  */
 u8_t
-snmp_ip_to_oid(const ip_addr_t *ip, u32_t *oid)
+snmp_ip_to_oid(const struct net_in_addr *ip, u32_t *oid)
 {
-  if (IP_IS_ANY_TYPE_VAL(*ip)) {
+  if (ip->s_addr == 0) {
     oid[0] = 0; /* any */
     oid[1] = 0; /* no IP OIDs follow */
     return 2;
-  } else if (IP_IS_V6(ip)) {
-#if LWIP_IPV6
-    oid[0] = 2; /* ipv6 */
-    oid[1] = 16; /* 16 InetAddressIPv6 OIDs follow */
-    snmp_ip6_to_oid(ip_2_ip6(ip), &oid[2]);
-    return 18;
-#else /* LWIP_IPV6 */
-    return 0;
-#endif /* LWIP_IPV6 */
-  } else {
-#if LWIP_IPV4
-    oid[0] = 1; /* ipv4 */
-    oid[1] = 4; /* 4 InetAddressIPv4 OIDs follow */
-    snmp_ip4_to_oid(ip_2_ip4(ip), &oid[2]);
-    return 6;
-#else /* LWIP_IPV4 */
-    return 0;
-#endif /* LWIP_IPV4 */
   }
+
+  oid[0] = 1; /* ipv4 */
+  oid[1] = 4; /* 4 InetAddressIPv4 OIDs follow */
+  snmp_ip4_to_oid(ip, &oid[2]);
+
+  return 6;
 }
 
 /**
- * Convert from InetAddressType+InetAddress to ip_addr_t
+ * Convert from InetAddressType+InetAddress to an IPv4 address
  * @param oid OID
  * @param oid_len OID length
  * @param ip IP address
  * @return Parsed OID length
  */
 u8_t
-snmp_oid_to_ip(const u32_t *oid, u8_t oid_len, ip_addr_t *ip)
+snmp_oid_to_ip(const u32_t *oid, u8_t oid_len, struct net_in_addr *ip)
 {
   /* InetAddressType */
   if (oid_len < 1) {
@@ -457,66 +383,32 @@ snmp_oid_to_ip(const u32_t *oid, u8_t oid_len, ip_addr_t *ip)
 
   if (oid[0] == 0) { /* any */
     /* 1x InetAddressType, 1x OID len */
-    if (oid_len < 2) {
-      return 0;
-    }
-    if (oid[1] != 0) {
+    if ((oid_len < 2) || (oid[1] != 0)) {
       return 0;
     }
 
-    memset(ip, 0, sizeof(*ip));
-    IP_SET_TYPE(ip, IPADDR_TYPE_ANY);
+    ip->s_addr = 0;
 
     return 2;
   } else if (oid[0] == 1) { /* ipv4 */
-#if LWIP_IPV4
     /* 1x InetAddressType, 1x OID len, 4x InetAddressIPv4 */
-    if (oid_len < 6) {
+    if ((oid_len < 6) || (oid[1] != 4)) {
       return 0;
     }
 
-    /* 4x ipv4 OID */
-    if (oid[1] != 4) {
-      return 0;
-    }
-
-    IP_SET_TYPE(ip, IPADDR_TYPE_V4);
-    if (!snmp_oid_to_ip4(&oid[2], ip_2_ip4(ip))) {
+    if (!snmp_oid_to_ip4(&oid[2], ip)) {
       return 0;
     }
 
     return 6;
-#else /* LWIP_IPV4 */
-    return 0;
-#endif /* LWIP_IPV4 */
-  } else if (oid[0] == 2) { /* ipv6 */
-#if LWIP_IPV6
-    /* 1x InetAddressType, 1x OID len, 16x InetAddressIPv6 */
-    if (oid_len < 18) {
-      return 0;
-    }
-
-    /* 16x ipv6 OID */
-    if (oid[1] != 16) {
-      return 0;
-    }
-
-    IP_SET_TYPE(ip, IPADDR_TYPE_V6);
-    if (!snmp_oid_to_ip6(&oid[2], ip_2_ip6(ip))) {
-      return 0;
-    }
-
-    return 18;
-#else /* LWIP_IPV6 */
-    return 0;
-#endif /* LWIP_IPV6 */
-  } else { /* unsupported InetAddressType */
-    return 0;
   }
+
+  /* unsupported InetAddressType; this port is IPv4 only */
+  return 0;
 }
 
 /**
- * Convert from InetAddressType+InetAddress+InetPortNumber to ip_addr_t and u16_t
+ * Convert from InetAddressType+InetAddress+InetPortNumber to an address and port
  * @param oid OID
  * @param oid_len OID length
  * @param ip IP address
@@ -524,7 +416,7 @@ snmp_oid_to_ip(const u32_t *oid, u8_t oid_len, ip_addr_t *ip)
  * @return Parsed OID length
  */
 u8_t
-snmp_oid_to_ip_port(const u32_t *oid, u8_t oid_len, ip_addr_t *ip, u16_t *port)
+snmp_oid_to_ip_port(const u32_t *oid, u8_t oid_len, struct net_in_addr *ip, u16_t *port)
 {
   u8_t idx;
 
@@ -546,8 +438,6 @@ snmp_oid_to_ip_port(const u32_t *oid, u8_t oid_len, ip_addr_t *ip, u16_t *port)
 
   return idx;
 }
-
-#endif /* LWIP_IPV4 || LWIP_IPV6 */
 
 /**
  * Assign an OID to struct snmp_obj_id
@@ -675,17 +565,6 @@ u8_t
 snmp_oid_equal(const u32_t *oid1, u8_t oid1_len, const u32_t *oid2, u8_t oid2_len)
 {
   return (snmp_oid_compare(oid1, oid1_len, oid2, oid2_len) == 0) ? 1 : 0;
-}
-
-/**
- * Convert netif to interface index
- * @param netif netif
- * @return index
- */
-u8_t
-netif_to_num(const struct netif *netif)
-{
-  return netif_get_index(netif);
 }
 
 static const struct snmp_mib *

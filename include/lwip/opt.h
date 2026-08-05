@@ -8,6 +8,9 @@
 #define LWIP_OPT_H
 
 #include <zephyr/logging/log.h>
+#include <zephyr/net/net_ip.h>
+
+#include "lwip/def.h"
 
 #define LWIP_SNMP      1
 #define LWIP_IPV4      1
@@ -24,6 +27,10 @@ typedef unsigned   int u32_t;
  * the same as sys_jiffies or at least based on it
  */
 u32_t sys_now (void);
+
+/** sysUpTime is in hundredths of a second; sys_now() is in milliseconds.
+ *  This wraps after about 49 days, as the MIB-2 type does. */
+#define MIB2_COPY_SYSUPTIME_TO(ptrToVal) (*(ptrToVal) = (sys_now() / 10))
 
 #define LWIP_DONT_PROVIDE_BYTEORDER_FUNCTIONS  1
 
@@ -75,9 +82,9 @@ typedef struct ip4_addr ip4_addr_t;
 
 #define MIB2_STATS   1
 
+
 #define LWIP_UDP     1
 
-#include "lwip/stats.h"
 
 /** In the following macro, message will contain
  *  both a format string and possible arguments. Every file using it must

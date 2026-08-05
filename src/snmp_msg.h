@@ -45,7 +45,6 @@
 #include "lwip/apps/snmp.h"
 #include "lwip/apps/snmp_core.h"
 #include "snmp_pbuf_stream.h"
-#include "lwip/ip_addr.h"
 #include "lwip/err.h"
 
 
@@ -80,7 +79,7 @@ struct snmp_request {
   /* Communication handle */
   void *handle;
   /* source IP address */
-  const ip_addr_t *source_ip;
+  const struct net_in_addr *source_ip;
   /* source UDP port */
   u16_t source_port;
   /* incoming snmp version */
@@ -147,9 +146,9 @@ extern const char *snmp_community_write;
 /** handle for sending traps */
 extern void *snmp_traps_handle;
 
-void snmp_receive(void *handle, u8_t *data, u16_t len, const ip_addr_t *source_ip, u16_t port);
-err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const ip_addr_t *dst, u16_t port);
-u8_t snmp_get_local_ip_for_dst(void *handle, const ip_addr_t *dst, ip_addr_t *result);
+void snmp_receive(void *handle, u8_t *data, u16_t len, const struct net_in_addr *source_ip, u16_t port);
+err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const struct net_in_addr *dst, u16_t port);
+u8_t snmp_get_local_ip_for_dst(void *handle, const struct net_in_addr *dst, struct net_in_addr *result);
 err_t snmp_varbind_length(struct snmp_varbind *varbind, struct snmp_varbind_len *len);
 err_t snmp_append_outbound_varbind(struct snmp_pbuf_stream *pbuf_stream, struct snmp_varbind *varbind);
 

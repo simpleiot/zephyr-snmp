@@ -40,7 +40,6 @@
 
 #if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
 
-#include "lwip/ip_addr.h"
 #include "lwip/err.h"
 
 #ifdef __cplusplus
@@ -302,23 +301,22 @@ u8_t snmp_oid_equal(const u32_t *oid1, u8_t oid1_len, const u32_t *oid2, u8_t oi
 s8_t snmp_oid_compare(const u32_t *oid1, u8_t oid1_len, const u32_t *oid2, u8_t oid2_len);
 
 #if LWIP_IPV4
-u8_t snmp_oid_to_ip4(const u32_t *oid, ip4_addr_t *ip);
-void snmp_ip4_to_oid(const ip4_addr_t *ip, u32_t *oid);
+u8_t snmp_oid_to_ip4(const u32_t *oid, struct net_in_addr *ip);
+void snmp_ip4_to_oid(const struct net_in_addr *ip, u32_t *oid);
 #endif /* LWIP_IPV4 */
 #if LWIP_IPV6
 u8_t snmp_oid_to_ip6(const u32_t *oid, ip6_addr_t *ip);
 void snmp_ip6_to_oid(const ip6_addr_t *ip, u32_t *oid);
 #endif /* LWIP_IPV6 */
 #if LWIP_IPV4 || LWIP_IPV6
-u8_t snmp_ip_to_oid(const ip_addr_t *ip, u32_t *oid);
-u8_t snmp_ip_port_to_oid(const ip_addr_t *ip, u16_t port, u32_t *oid);
+u8_t snmp_ip_to_oid(const struct net_in_addr *ip, u32_t *oid);
+u8_t snmp_ip_port_to_oid(const struct net_in_addr *ip, u16_t port, u32_t *oid);
 
-u8_t snmp_oid_to_ip(const u32_t *oid, u8_t oid_len, ip_addr_t *ip);
-u8_t snmp_oid_to_ip_port(const u32_t *oid, u8_t oid_len, ip_addr_t *ip, u16_t *port);
+u8_t snmp_oid_to_ip(const u32_t *oid, u8_t oid_len, struct net_in_addr *ip);
+u8_t snmp_oid_to_ip_port(const u32_t *oid, u8_t oid_len, struct net_in_addr *ip, u16_t *port);
 #endif /* LWIP_IPV4 || LWIP_IPV6 */
 
 struct netif;
-u8_t netif_to_num(const struct netif *netif);
 
 snmp_err_t snmp_set_test_ok(struct snmp_node_instance* instance, u16_t value_len, void* value); /* generic function which can be used if test is always successful */
 

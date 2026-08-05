@@ -46,9 +46,6 @@ LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 #include "snmp_asn1.h"
 #include "snmp_core_priv.h"
 #include "lwip/def.h"
-#include "lwip/ip_addr.h"
-#include "lwip/stats.h"
-#include "lwip/snmp.h"
 #include "lwip/apps/snmp_callback.h"
 
 
@@ -233,7 +230,7 @@ static const char *request_name (int request)
 }
 
 void
-snmp_receive(void *handle, u8_t *data, u16_t len, const ip_addr_t *source_ip, u16_t port)
+snmp_receive(void *handle, u8_t *data, u16_t len, const struct net_in_addr *source_ip, u16_t port)
 {
   err_t err;
   struct snmp_request request;
