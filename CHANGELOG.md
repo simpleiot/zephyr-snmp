@@ -8,6 +8,10 @@ and this project adheres to
 
 ## [unreleased]
 
+- demonstrate traps in samples/agent: a cold start trap once the agent is
+  running, then an enterprise-specific trap carrying a variable binding every
+  `CONFIG_SAMPLE_TRAP_PERIOD_SECONDS`, aimed at `CONFIG_SAMPLE_TRAP_MANAGER`.
+  The sample README covers receiving them with snmptrapd
 - make the host network stack the documented default for running the sample on
   native_sim, since it needs neither root nor a TAP interface, and describe the
   zeth route as the alternative for exercising the interfaces group against
