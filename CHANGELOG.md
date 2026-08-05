@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [unreleased]
 
+## [v0.1.0] - 2026-08-05
+
 - require Zephyr 4.4 explicitly. The module builds on the namespaced
   networking API that arrived in that release, and `zephyr/module.yml` has no
   field for a kernel version, so `CMakeLists.txt` checks it and fails with a
