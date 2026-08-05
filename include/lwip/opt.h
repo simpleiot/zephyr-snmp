@@ -7,6 +7,8 @@
 #ifndef LWIP_OPT_H
 #define LWIP_OPT_H
 
+#include <zephyr/logging/log.h>
+
 #define LWIP_SNMP      1
 #define LWIP_IPV4      1
 
@@ -77,15 +79,14 @@ typedef struct ip4_addr ip4_addr_t;
 
 #include "lwip/stats.h"
 
-size_t zephyr_log(const char * format, ...);
-
 /** In the following macro, message will contain
- *  both a format string and possible arguments. */
-#define LWIP_DEBUGF(debug, message) do { zephyr_log message; } while (0)
+ *  both a format string and possible arguments. Every file using it must
+ *  first name the log module with LOG_MODULE_DECLARE(). */
+#define LWIP_DEBUGF(debug, message) do { LOG_DBG message; } while (0)
 
 /** In the following macro, message will contain
  *  a const char string. */
-#define LWIP_ASSERT(phrase, expression) do { if (!(expression)) zephyr_log("%s", (phrase)); } while (0)
+#define LWIP_ASSERT(phrase, expression) do { if (!(expression)) LOG_ERR("%s", (phrase)); } while (0)
 
 #ifndef NETIF_MAX_HWADDR_LEN
     #define NETIF_MAX_HWADDR_LEN    6
@@ -126,7 +127,12 @@ extern struct netif *netif_list;
   LWIP_PLATFORM_ERROR(message); handler;}} while(0)
 #endif /* LWIP_ERROR */
 
-const char * print_oid (size_t oid_len, const u32_t *oid_words);
+/** Longest OID rendered as text: SNMP_MAX_OBJ_ID_LEN sub-identifiers,
+ *  each at most 10 digits plus a separator, and the terminator. */
+#define SNMP_OID_STR_LEN (SNMP_MAX_OBJ_ID_LEN * 11U + 1U)
+
+const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len,
+			    const u32_t *oid_words);
 
 /* The following function is "private", it will be called by the SNMP stack. */
 size_t snmp_private_call_handler(const char *prefix, void *value);

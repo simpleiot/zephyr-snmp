@@ -19,6 +19,20 @@ and this project adheres to
 - remove code that was never reachable in this port: the SNMPv3 and USM
   sources, the lwIP netconn and raw transports, thread synchronization, the
   MIB-2 icmp and tcp groups, and the conditional regions that selected them
+- rename `CONFIG_LIB_SNMP` to `CONFIG_SNMP_AGENT`, which now depends on
+  `NET_IPV4` and `NET_UDP` and selects the socket options the agent needs
+- replace `CONFIG_SNMP_LOG_LEVEL`, which nothing read, with the standard
+  networking log template: `CONFIG_SNMP_AGENT_LOG_LEVEL` filters the
+  `net_snmp_agent` module
+- add `CONFIG_SNMP_AGENT_MAX_MSG_SIZE`, `CONFIG_SNMP_AGENT_TRAP_DESTINATIONS`,
+  `CONFIG_SNMP_AGENT_PORT`, and `CONFIG_SNMP_AGENT_TRAP_PORT` in place of the
+  buffer sizes and port numbers that were compiled in
+- log through `LOG_ERR`, `LOG_WRN`, `LOG_INF`, and `LOG_DBG` at levels that
+  suit each message, replacing the `zephyr_log()` wrapper that shared one
+  static buffer and reported everything at info level
+- give `print_oid()` a caller-supplied buffer, as `snmp_oid_to_str()`; the
+  shared static buffer it used before returned the same storage when a single
+  log statement rendered two OIDs
 
 ## [v0.0.6] - 2025-05-08
 

@@ -37,6 +37,8 @@
 
 #include "lwip/apps/snmp_opts.h"
 
+LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
+
 #if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
 
 #include "lwip/apps/snmp_core.h"

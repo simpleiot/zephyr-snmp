@@ -83,6 +83,8 @@
 
 #include <string.h>
 
+LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
+
 #define SIZEOF_STRUCT_PBUF           LWIP_MEM_ALIGN_SIZE( sizeof( struct pbuf ) )
 
 /* Since the pool is created in memp, PBUF_POOL_BUFSIZE will be automatically

@@ -38,6 +38,8 @@
 
 #include "lwip/apps/snmp_opts.h"
 
+LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
+
 #if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
 
 #include <string.h>
@@ -320,7 +322,7 @@ snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16
     snmp_stats.outpkts++;
 
     /* snmp_sendto() wants a network-endian port number. */
-    u16_t port = ntohs(LWIP_IANA_PORT_SNMP_TRAP);
+    u16_t port = ntohs(CONFIG_SNMP_AGENT_TRAP_PORT);
     /** send to the TRAP destination */
     rc = snmp_sendto(snmp_traps_handle, p, dip, port);
     if (rc <= 0) {
@@ -328,7 +330,7 @@ snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16
 	}
     pbuf_free(p);
   } else {
-	zephyr_log ("snmp_send_msg: pbuf_alloc failed\n");
+	LOG_ERR("snmp_send_msg: cannot allocate a %u byte trap buffer", (unsigned)tot_len);
     err = ERR_MEM;
   }
   return err;

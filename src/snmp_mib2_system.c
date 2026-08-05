@@ -43,6 +43,8 @@
 
 #include <string.h>
 
+LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
+
 #if LWIP_SNMP && SNMP_LWIP_MIB2
 
 #define SYNC_NODE_NAME(node_name) node_name
@@ -245,7 +247,7 @@ system_get_value(const struct snmp_scalar_array_node_def *node, void *value)
   const s16_t *var_len;
   u16_t result;
 
-  zephyr_log("system_get_value(%d): %s\n", node->oid, oid_name(node->oid));
+  LOG_DBG("system_get_value(%d): %s", (int)node->oid, oid_name(node->oid));
 
   switch (node->oid) {
     case 1: /* sysDescr */

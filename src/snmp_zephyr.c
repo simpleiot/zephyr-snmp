@@ -60,7 +60,7 @@
 	#include "lwip/sys.h"
 	#include "lwip/prot/iana.h"
 
-	LOG_MODULE_REGISTER( snmp_log, LOG_LEVEL_DBG );
+	LOG_MODULE_REGISTER(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
 
 	typedef struct
 	{
@@ -71,10 +71,8 @@
 	/* The collection of sockets in use. */
 	static socket_set_t socket_set;
 
-	#define MAX_BUF_LEN 96 // When we have enough RAM, increase to 484
-
 	typedef struct {
-		char buf[MAX_BUF_LEN];
+		char buf[CONFIG_SNMP_AGENT_MAX_MSG_SIZE];
 		ssize_t len;
 		int fd;
 		struct sockaddr addr;
@@ -122,19 +120,18 @@
 
 		if( socket_fd < 0 )
 		{
-			zephyr_log( "create_socket: error: socket: %d errno: %d\n", socket_fd, errno );
+			LOG_ERR("create_socket: socket() failed: %d, errno %d", socket_fd, errno);
 		}
 		else
 		{
-			zephyr_log( "create_socket: socket: %d %s (OK)\n",
-				socket_fd,
-				(port == LWIP_IANA_PORT_SNMP_TRAP) ? "traps" : "server");
+			LOG_DBG("create_socket: socket %d for %s", socket_fd,
+				(port == CONFIG_SNMP_AGENT_TRAP_PORT) ? "traps" : "requests");
 
 			ret = zsock_getsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, &optlen );
 
 			if (ret == 0 && opt != 0)
 			{
-				zephyr_log( "create_socket: IPV6_V6ONLY option is on, turning it off.\n" );
+				LOG_DBG("create_socket: turning off IPV6_V6ONLY");
 
 				opt = 0;
 				ret = zsock_setsockopt( socket_fd, IPPROTO_IPV6, IPV6_V6ONLY,
@@ -142,7 +139,7 @@
 
 				if( ret < 0 )
 				{
-					zephyr_log( "create_socket: Cannot turn off IPV6_V6ONLY option\n" );
+					LOG_WRN("create_socket: cannot turn off IPV6_V6ONLY");
 				}
 			}
 
@@ -150,11 +147,11 @@
 			tv.tv_sec = 0;
 			tv.tv_usec = 1000;
 			int rc = zsock_setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
-			zephyr_log( "process_udp: setsockopt %d\n", rc);
+			LOG_DBG("create_socket: setsockopt(SO_RCVTIMEO) returned %d", rc);
 
 			if( zsock_bind( socket_fd, ( struct sockaddr * ) &bind_addr, sizeof( bind_addr ) ) < 0 )
 			{
-				zephyr_log( "create_socket: bind: %d\n", errno );
+				LOG_ERR("create_socket: bind to port %u failed, errno %d", port, errno);
 			}
 		}
 		return socket_fd;
@@ -224,16 +221,17 @@
 				struct sockaddr_in * sin = (struct sockaddr_in *) &client_addr;
 				memcpy (&client_addr, &recv->addr, sizeof client_addr);
 			
-				int port = (recv->fd == socket_set.socket_161) ? 161 : 162;
-				zephyr_log( "recv[%u]: %d bytes from %s:%u\n",
-				 	port, len, inet_ntoa(sin->sin_addr), ntohs(sin->sin_port));
+				int port = (recv->fd == socket_set.socket_161) ?
+					CONFIG_SNMP_AGENT_PORT : CONFIG_SNMP_AGENT_TRAP_PORT;
+				LOG_DBG("recv[%u]: %d bytes from %s:%u", port, (int)len,
+					inet_ntoa(sin->sin_addr), ntohs(sin->sin_port));
 
 				handle_snmp_packet(packet_id);
 
 				recvPackets[packet_id].len = 0;
 			} /* if (recvPackets[0].len > 0) */
 		} else {
-			zephyr_log("snmp_recv_packet: invalid packet_id = %d\n", packet_id);
+			LOG_WRN("snmp_recv_packet: invalid packet_id %d", packet_id);
 		}
 	}
 
@@ -275,8 +273,6 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 				packet_id = 0;
 			}
 			recvPackets[packet_id].len = 0;
-		} else {
-//			zephyr_log ("udp_service_handler: recvfrom() returns rc = %d\n", len);
 		}
 	}
 
@@ -292,8 +288,8 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 			has_created = true;
 
 			/* Create the sockets. */
-			socket_set.socket_161 = create_socket(LWIP_IANA_PORT_SNMP);
-			socket_set.socket_162 = create_socket(LWIP_IANA_PORT_SNMP_TRAP);
+			socket_set.socket_161 = create_socket(CONFIG_SNMP_AGENT_PORT);
+			socket_set.socket_162 = create_socket(CONFIG_SNMP_AGENT_TRAP_PORT);
 
 			/* The lwIP SNMP driver owns a socket for traps 'snmp_traps_handle'. */
 			snmp_traps_handle = ( void * ) socket_set.socket_162;
@@ -322,10 +318,11 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 				fds[1].fd = socket_set.socket_162;
 				fds[1].events = ZSOCK_POLLIN;
 
-				int ret = net_socket_service_register(&service_udp, fds, ARRAY_SIZE(fds), NULL);
-				zephyr_log("net_socket_service_register: rc %d\n", ret);
+				int ret = net_socket_service_register(&service_udp, fds,
+								      ARRAY_SIZE(fds), NULL);
+
 				if (ret < 0) {
-					// handle error
+					LOG_ERR("net_socket_service_register failed: %d", ret);
 				}
 			}
 		}
@@ -362,8 +359,6 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 		struct in_addr in_addr;
 		(void)handle;
 
-		in_addr.s_addr = dst->addr;
-//      zephyr_log ("snmp_get_local_ip_for_dst: dst->addr = %s\n", inet_ntoa(in_addr));
 		ip_addr_copy( *result, *dst_ip );
 
 		return 1;
@@ -411,49 +406,36 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 	}
 
 
-size_t zephyr_log( const char * format,
-				 ... )
+const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len,
+			    const u32_t *oid_words)
 {
-	va_list args;
-	static char toprint[ 201 ];
-
-	va_start( args, format );
-	size_t rc = vsnprintf(toprint, sizeof toprint, format, args);
-	va_end( args );
-	if (rc > 2) {
-		if (rc > sizeof toprint - 1) {
-			rc = sizeof toprint - 1; /* buffer was too short */
-		}
-		while (rc > 0) {
-			if (toprint[rc-1] != 10 && toprint[rc-1] != 13)	{
-				break;
-			}
-			/* Remove the CR or LF */
-			toprint[--rc] = 0;
-		}
-	}
-
-	if (rc >= 1) {
-		LOG_INF ("%s", toprint);
-	}
-	return rc;
-}
-
-const char * print_oid (size_t oid_len, const u32_t *oid_words)
-{
-	int length = 0;
-	size_t index;
 	size_t count = (oid_len <= SNMP_MAX_OBJ_ID_LEN) ? oid_len : SNMP_MAX_OBJ_ID_LEN;
-	#define buf_size   128U
-	static char buf[buf_size];
+	size_t length = 0;
+	size_t index;
 
-	buf[0] = 0;
-	if (count > 0) {
-		length += snprintf (buf+length, sizeof buf-length, "%u", oid_words[0]);
+	if (buf_size == 0) {
+		return buf;
 	}
-	for (index = 1; index < count; index++) {
-		length += snprintf (buf + length, buf_size - length, ".%u", oid_words[index]);
+
+	buf[0] = '\0';
+
+	for (index = 0; index < count && length < buf_size - 1; index++) {
+		int written = snprintf(buf + length, buf_size - length,
+				       (index == 0) ? "%u" : ".%u",
+				       (unsigned)oid_words[index]);
+
+		if (written < 0) {
+			break;
+		}
+		/* snprintf() reports what it would have written, so stop at
+		 * the point where the buffer ran out rather than past it. */
+		if ((size_t)written >= buf_size - length) {
+			length = buf_size - 1;
+			break;
+		}
+		length += (size_t)written;
 	}
+
 	return buf;
 }
 

@@ -39,6 +39,8 @@
 #include "lwip/apps/snmp_mib2.h"
 #include "lwip/apps/snmp_scalar.h"
 
+LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
+
 #if LWIP_SNMP && SNMP_LWIP_MIB2
 
 #define MIB2_AUTH_TRAPS_ENABLED  1

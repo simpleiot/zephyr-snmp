@@ -38,21 +38,6 @@ extern void snmp_recv_packet(int packet_id);
  */
 extern void snmp_prepare_trap_test(const char *ip_address);
 
-/**
- * @brief Converts an array of integeres to a human-readable
- *        character string, representing the OID.
- *
- * @param[in] oid_len The number of integeres in the parameter oid_words
- * @param[in] oid_words The array of integer values
- */
-const char *print_oid(size_t oid_len, const u32_t *oid_words);
-
-size_t zephyr_log( const char * format, ... )
-#ifdef __GNUC__
-	__attribute__ ((format (printf, 1, 2)))
-#endif
-;
-
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

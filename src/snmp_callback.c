@@ -8,6 +8,8 @@
 #include "lwip/apps/snmp_core.h"
 #include "lwip/apps/snmp_callback.h"
 
+LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
+
 /** The first entry in a liinked list of handler entries. */
 static struct snmp_handler_entry * first_handler = NULL;
 
@@ -58,13 +60,14 @@ size_t snmp_private_call_handler(const char *prefix, void *value_p)
 
             
 	/* value is actually an array of SNMP_VALUE_BUFFER_SIZE bytes. */
-	zephyr_log("snmp_private_call_handler: Looking for %s\n", prefix);
+	LOG_DBG("snmp_private_call_handler: looking for %s", prefix);
 	while (entry != NULL) {
 		if (entry->handler) {
 			size_t mlength = match_length(prefix, entry->prefix);
 			char special = entry->prefix[mlength-1];
 			bool does_match = (mlength >= plength) || (mlength == strlen (entry->prefix));
-			zephyr_log("Match %s \"%s\" %d/%d special = %c\n", does_match ? "true" : "false", entry->prefix, mlength, plength, special);
+			LOG_DBG("match %s \"%s\" %d/%d special = %c", does_match ? "true" : "false",
+				entry->prefix, mlength, plength, special);
 			if (does_match) {
 				int value = entry->handler(prefix, entry);
 				value_length = sizeof value;
@@ -74,7 +77,7 @@ size_t snmp_private_call_handler(const char *prefix, void *value_p)
 		}
 		entry = entry->next;
 	}
-	zephyr_log ("snmp_private_call_handler (%s): %sfound\n", prefix, value_length ? "" : "not ");
+	LOG_DBG("snmp_private_call_handler (%s): %sfound", prefix, value_length ? "" : "not ");
 	return value_length;
 }
 

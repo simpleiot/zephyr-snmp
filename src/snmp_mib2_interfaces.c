@@ -45,6 +45,8 @@
 
 #include <string.h>
 
+LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
+
 #if LWIP_SNMP && SNMP_LWIP_MIB2
 
 #define SYNC_NODE_NAME(node_name) node_name

@@ -207,7 +207,12 @@ void mib2_udp_unbind(struct udp_pcb *pcb);
 #define snmp_inc_ifouterrors(ni)       MIB2_STATS_NETIF_INC(ni, ifouterrors)
 
 /* Function to write an object ID as a readable string,e.g. "1.4.2.3" */
-const char * print_oid (size_t oid_len, const u32_t *oid_words);
+/** Longest OID rendered as text: SNMP_MAX_OBJ_ID_LEN sub-identifiers,
+ *  each at most 10 digits plus a separator, and the terminator. */
+#define SNMP_OID_STR_LEN (SNMP_MAX_OBJ_ID_LEN * 11U + 1U)
+
+const char *snmp_oid_to_str(char *buf, size_t buf_size, size_t oid_len,
+			    const u32_t *oid_words);
 
 #ifdef __cplusplus
 }

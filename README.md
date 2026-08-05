@@ -31,7 +31,7 @@ manifest:
 ```
 
 Then run `west update`. Zephyr discovers the module through
-`zephyr/module.yml` and builds it whenever `CONFIG_LIB_SNMP` is set.
+`zephyr/module.yml` and builds it whenever `CONFIG_SNMP_AGENT` is set.
 
 ### Without west
 
@@ -47,14 +47,13 @@ list(APPEND ZEPHYR_EXTRA_MODULES /path/to/zephyr-snmp)
 A minimal `prj.conf` for an application using the agent:
 
 ```
-CONFIG_LIB_SNMP=y
+CONFIG_SNMP_AGENT=y
 
-# Networking: IPv4 UDP sockets plus the socket service the agent polls with
+# Networking: IPv4 UDP, which the agent selects sockets and the socket
+# service on top of
 CONFIG_NETWORKING=y
 CONFIG_NET_IPV4=y
 CONFIG_NET_UDP=y
-CONFIG_NET_SOCKETS=y
-CONFIG_NET_SOCKETS_SERVICE=y
 
 # inet_addr() and inet_ntoa() come from the POSIX networking layer
 CONFIG_POSIX_API=y
@@ -65,8 +64,15 @@ CONFIG_HEAP_MEM_POOL_SIZE=4096
 CONFIG_LOG=y
 ```
 
-`CONFIG_SNMP_LOG_LEVEL` sets the default log level for the library, which
-logs through the `snmp_log` module.
+`CONFIG_SNMP_AGENT_LOG_LEVEL` sets the log level for the agent, which logs
+through the `net_snmp_agent` module. `CONFIG_SNMP_AGENT_MAX_MSG_SIZE` sizes
+the receive and transmit buffers, and so caps how large a request the agent
+accepts and how large a response it produces.
+`CONFIG_SNMP_AGENT_TRAP_DESTINATIONS` sets how many managers the agent can
+send traps to.
+
+Request handling runs on Zephyr's shared socket service thread, so
+`CONFIG_NET_SOCKETS_SERVICE_STACK_SIZE` may need raising.
 
 The library includes `<app_version.h>`, and Zephyr generates that header only
 when the application directory contains a `VERSION` file. Add one if your

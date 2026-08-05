@@ -37,6 +37,8 @@
 
 #include "lwip/apps/snmp_opts.h"
 
+LOG_MODULE_DECLARE(net_snmp_agent, CONFIG_SNMP_AGENT_LOG_LEVEL);
+
 #if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
 
 #include "snmp_msg.h"
@@ -230,16 +232,17 @@ snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t por
   snmp_stats.inpkts++;
 
   err = snmp_parse_inbound_frame( &request );
-  zephyr_log( "snmp_receive: snmp_parse returns %02X type %s\n",
-    err,
-	request_name (request.request_type));
+  LOG_DBG("snmp_receive: snmp_parse returns %02X type %s", err,
+	  request_name(request.request_type));
 
   if (err == ERR_OK) {
     if (request.request_type == SNMP_ASN1_CONTEXT_PDU_GET_RESP)	{
       if (request.error_status == SNMP_ERR_NOERROR)	{
         snmp_vb_enumerator_err_t err;
         struct snmp_varbind vb;
-        zephyr_log( "snmp_receive: received a get-response\n" );
+        char oid_str[SNMP_OID_STR_LEN];
+
+        LOG_DBG("snmp_receive: received a get-response");
 
         memset( &vb, 0, sizeof vb );
         vb.object_value = request.value_buffer;
@@ -249,8 +252,8 @@ snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t por
         while( request.error_status == SNMP_ERR_NOERROR ) {
           err = snmp_vb_enumerator_get_next( &request.inbound_varbind_enumerator, &vb );
           if( err == SNMP_VB_ENUMERATOR_ERR_OK ) {
-            zephyr_log("getRequest %s\n",
-            print_oid(vb.oid.len, vb.oid.id));
+            LOG_DBG("getRequest %s",
+		    snmp_oid_to_str(oid_str, sizeof(oid_str), vb.oid.len, vb.oid.id));
             break;
           }
         }
@@ -373,15 +376,17 @@ snmp_process_varbind(struct snmp_request *request, struct snmp_varbind *vb, u8_t
   } else {
 	s16_t len = 0;
 	{
+		char oid_str[SNMP_OID_STR_LEN];
 		const char *ptr;
-		ptr = print_oid(vb->oid.len, vb->oid.id);
+
+		ptr = snmp_oid_to_str(oid_str, sizeof(oid_str), vb->oid.len, vb->oid.id);
 		len = snmp_private_call_handler(ptr, vb->object_value);
 		/* When the OID is not found, call the earlier get_value() method. */
 		if ((len == 0) && (node_instance.get_value != NULL)) {
 		  len = node_instance.get_value(&node_instance, vb->object_value);
 		  if (len <= 0) {
 		  	/* Log this event, just for debugging. */
-			  zephyr_log("snmp_process_varbind: no value found for %s\n", ptr);
+			  LOG_DBG("snmp_process_varbind: no value found for %s", ptr);
 		  }
 		}
 	}
@@ -418,8 +423,8 @@ snmp_process_get_request( struct snmp_request * request )
 {
   snmp_vb_enumerator_err_t err;
   struct snmp_varbind vb;
+  char oid_str[SNMP_OID_STR_LEN];
 
-  /* _HT_ for debug only, clean up later. */
   memset( &vb, 0, sizeof vb );
   vb.object_value = request->value_buffer;
 
@@ -429,8 +434,8 @@ snmp_process_get_request( struct snmp_request * request )
     err = snmp_vb_enumerator_get_next( &request->inbound_varbind_enumerator, &vb );
 
     if( err == SNMP_VB_ENUMERATOR_ERR_OK ) {
-      zephyr_log ("getRequest %s\n",
-      print_oid(vb.oid.len, vb.oid.id));
+      LOG_DBG("getRequest %s",
+	      snmp_oid_to_str(oid_str, sizeof(oid_str), vb.oid.len, vb.oid.id));
 
       if ((vb.type == SNMP_ASN1_TYPE_NULL) && (vb.value_len == 0)) {
         snmp_process_varbind(request, &vb, 0);
@@ -442,7 +447,7 @@ snmp_process_get_request( struct snmp_request * request )
       break;
     } else if (err == SNMP_VB_ENUMERATOR_ERR_ASN1ERROR) {
       /* malformed ASN.1, don't answer */
-	  zephyr_log ("snmp_process_get_request: malformed ASN.1, don't answer");
+	  LOG_WRN("snmp_process_get_request: malformed ASN.1, not answering");
       return ERR_ARG;
     } else {
       request->error_status = SNMP_ERR_GENERROR;
@@ -717,15 +722,13 @@ snmp_parse_inbound_frame(struct snmp_request *request)
   memset (&tlv, 0, sizeof tlv);
   IF_PARSE_EXEC(snmp_pbuf_stream_init(&pbuf_stream, request->inbound_pbuf, 0, request->inbound_pbuf->tot_len));
 
-//zephyr_log("snmp_parse 1 bytes %d\n", request->inbound_pbuf->tot_len);
-
   /* decode main container consisting of version, community and PDU */
   IF_PARSE_EXEC(snmp_asn1_dec_tlv(&pbuf_stream, &tlv));
 
   if((tlv.type != SNMP_ASN1_TYPE_SEQUENCE) || (tlv.value_len != pbuf_stream.length)) {
-    zephyr_log("snmp_parse: type = %d ASN1_TYPE %d vlen %d length %d\n",
-	tlv.type, SNMP_ASN1_TYPE_SEQUENCE,
-	tlv.value_len, pbuf_stream.length);
+    LOG_WRN("snmp_parse: type %d, expected ASN.1 type %d; value_len %u, stream length %u",
+	    tlv.type, SNMP_ASN1_TYPE_SEQUENCE, (unsigned)tlv.value_len,
+	    (unsigned)pbuf_stream.length);
   }
 
   IF_PARSE_ASSERT((tlv.type == SNMP_ASN1_TYPE_SEQUENCE) && (tlv.value_len == pbuf_stream.length));
@@ -743,7 +746,7 @@ snmp_parse_inbound_frame(struct snmp_request *request)
        (s32_value != SNMP_VERSION_2c)
       )
      ) {
-    zephyr_log("snmp_parse: unsupported SNMP v%d\n", s32_value);
+    LOG_WRN("snmp_parse: unsupported SNMP version %d", (int)s32_value);
     /* unsupported SNMP version */
     snmp_stats.inbadversions++;
     /* Returning a "err_enum_t" where a "err_t" is expected */
@@ -903,7 +906,8 @@ snmp_prepare_outbound_frame(struct snmp_request *request)
   struct snmp_pbuf_stream *pbuf_stream = &(request->outbound_pbuf_stream);
 
   /* try allocating pbuf(s) for maximum response size */
-  request->outbound_pbuf = pbuf_alloc(PBUF_TRANSPORT, 1472, PBUF_RAM);
+  request->outbound_pbuf = pbuf_alloc(PBUF_TRANSPORT, CONFIG_SNMP_AGENT_MAX_MSG_SIZE,
+                                     PBUF_RAM);
   if (request->outbound_pbuf == NULL) {
     return ERR_MEM;
   }
@@ -1112,7 +1116,7 @@ snmp_complete_outbound_frame(struct snmp_request *request)
         case SNMP_ERR_NOSUCHINSTANCE:
         case SNMP_ERR_NOSUCHOBJECT:
         case SNMP_ERR_ENDOFMIBVIEW:
-		  zephyr_log("SNMP_ERR_NOSUCHINSTANCE\n");
+		  LOG_DBG("SNMP_ERR_NOSUCHINSTANCE");
           request->error_status = SNMP_ERR_NOSUCHNAME;
           break;
         /* mapping according to RFC */

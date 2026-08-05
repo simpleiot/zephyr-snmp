@@ -63,9 +63,7 @@
  * SNMP_TRAP_DESTINATIONS: Number of trap destinations. At least one trap
  * destination is required
  */
-#if !defined SNMP_TRAP_DESTINATIONS || defined __DOXYGEN__
-#define SNMP_TRAP_DESTINATIONS          1
-#endif
+#define SNMP_TRAP_DESTINATIONS          CONFIG_SNMP_AGENT_TRAP_DESTINATIONS
 
 /**
  * Only allow SNMP write actions that are 'safe' (e.g. disabling netifs is not
