@@ -12,3 +12,12 @@ tests:
     tags:
       - net
       - snmp
+  sample.net.snmp.agent.host:
+    build_only: true
+    platform_allow:
+      - native_sim
+    extra_args:
+      - EXTRA_CONF_FILE=overlay-host.conf
+    tags:
+      - net
+      - snmp

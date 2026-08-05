@@ -3,6 +3,21 @@
 
 if(CONFIG_SNMP_AGENT)
 
+# The agent builds on Zephyr's namespaced networking API, which arrived in
+# 4.4. Say so here: zephyr/module.yml has no field for a kernel version, and
+# without this the mismatch surfaces as a wall of implicit-declaration errors.
+set(SNMP_MIN_ZEPHYR_VERSION 4.4)
+
+if("${KERNEL_VERSION_MAJOR}.${KERNEL_VERSION_MINOR}.${KERNEL_PATCHLEVEL}"
+   VERSION_LESS ${SNMP_MIN_ZEPHYR_VERSION})
+  message(FATAL_ERROR
+    "zephyr-snmp requires Zephyr ${SNMP_MIN_ZEPHYR_VERSION} or later, but "
+    "this workspace is ${KERNEL_VERSION_STRING}. The agent uses the "
+    "namespaced networking API (zsock_*, NET_AF_INET, struct "
+    "net_sockaddr_in), which earlier releases do not provide. See the "
+    "compatibility table in the module README for a version that matches.")
+endif()
+
 zephyr_library_named(snmp)
 
 zephyr_include_directories(include)

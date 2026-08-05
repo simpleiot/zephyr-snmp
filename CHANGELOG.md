@@ -8,6 +8,15 @@ and this project adheres to
 
 ## [unreleased]
 
+- require Zephyr 4.4 explicitly. The module builds on the namespaced
+  networking API that arrived in that release, and `zephyr/module.yml` has no
+  field for a kernel version, so `CMakeLists.txt` checks it and fails with a
+  message naming the requirement instead of a wall of compile errors
+- document which Zephyr releases each version of the module supports, and drop
+  the migration notes for the 0.0.x series
+- build both sample configurations in continuous integration, through a
+  twister case for `overlay-host.conf` alongside the default one, and add a
+  `west.yml` so the workspace can be built around a checkout of the module
 - demonstrate traps in samples/agent: a cold start trap once the agent is
   running, then an enterprise-specific trap carrying a variable binding every
   `CONFIG_SAMPLE_TRAP_PERIOD_SECONDS`, aimed at `CONFIG_SAMPLE_TRAP_MANAGER`.

@@ -10,6 +10,18 @@ registering callbacks for individual OIDs or by adding a private MIB.
 
 SNMP v1 and v2c are supported, over IPv4.
 
+## Zephyr compatibility
+
+| zephyr-snmp | Zephyr        |
+| ----------- | ------------- |
+| 0.1.x       | 4.4 and later |
+
+The module uses Zephyr's namespaced networking API (`zsock_*`, `NET_AF_INET`,
+`struct net_sockaddr_in`, `net_htons`), which arrived in 4.4, and it does not
+require `CONFIG_POSIX_API`. Building against an earlier Zephyr stops at a
+version check in the module's `CMakeLists.txt` with a message naming the
+requirement, rather than failing later in the compile.
+
 ## Adding to your project
 
 ### As a west module
@@ -26,7 +38,7 @@ manifest:
   projects:
     - name: zephyr-snmp
       remote: simpleiot
-      revision: v0.0.6
+      revision: v0.1.0
       path: modules/lib/zephyr-snmp
 ```
 
@@ -406,27 +418,6 @@ filled in; they can return backed by `net_stats` and `net_context_foreach()`.
   the manager's port 162.
 - Only SNMP v1 and v2c are supported.
 - IPv4 only.
-
-## Migrating from v0.0.6
-
-The agent no longer needs a thread, a message queue, or a callback from the
-application:
-
-| Before                                | Now                                |
-| ------------------------------------- | ---------------------------------- |
-| `snmp_zephyr_init(handler)`           | `net_snmp_agent_start()`           |
-| `snmp_recv_packet(id)` in your thread | nothing; handled internally        |
-| `snmp_prepare_trap_test(addr)`        | `net_snmp_agent_trap_dst_set(addr)`|
-| `#include <lwip/apps/...>`            | `#include <snmp/...>`              |
-| `CONFIG_LIB_SNMP`                     | `CONFIG_SNMP_AGENT`                |
-
-`CONFIG_POSIX_API` and `CONFIG_HEAP_MEM_POOL_SIZE` are no longer required, nor
-is a `VERSION` file in the application. `net_snmp_agent_start()` and
-`net_snmp_agent_stop()` return 0 or a negative errno, where
-`snmp_zephyr_init()` returned non-zero for success. Calls into the library may
-now come from any thread. lwIP's short types are gone from the API: use
-`uint8_t` and `uint16_t` in place of `u8_t` and `u16_t`, and
-`struct net_in_addr` in place of `ip_addr_t`.
 
 ## License
 

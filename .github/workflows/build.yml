@@ -1,0 +1,73 @@
+# Copyright (c) 2025 Cliff Brake
+# SPDX-License-Identifier: Apache-2.0
+
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  twister:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the module
+        uses: actions/checkout@v4
+        with:
+          path: modules/lib/zephyr-snmp
+          # checkpatch below compares against the base of the branch.
+          fetch-depth: 0
+
+      # native_sim builds 32-bit by default, so the host compiler needs its
+      # 32-bit support alongside the toolchain the setup action installs.
+      - name: Install 32-bit host support
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y gcc-multilib g++-multilib
+
+      # Creates the workspace around the checkout from the module's own
+      # west.yml, and installs the toolchain and Python requirements.
+      - name: Set up Zephyr
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: modules/lib/zephyr-snmp
+          toolchains: x86_64-zephyr-elf
+
+      # Builds every configuration in samples/agent/sample.yaml, which covers
+      # both the default zeth build and the offloaded-sockets one.
+      - name: Build the samples
+        working-directory: modules/lib/zephyr-snmp
+        run: |
+          west twister \
+            --testsuite-root samples \
+            --platform native_sim \
+            --inline-logs \
+            --verbose
+
+      # Style is a convention of this repository rather than a gate, so report
+      # problems without failing the run.
+      - name: Run checkpatch on the changes
+        if: always()
+        continue-on-error: true
+        working-directory: modules/lib/zephyr-snmp
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git config --global --add safe.directory "$PWD"
+          base="${BASE_SHA:-HEAD~1}"
+          git diff "$base"..HEAD | \
+            "$GITHUB_WORKSPACE/zephyr/scripts/checkpatch.pl" --no-tree -
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: twister-results
+          path: modules/lib/zephyr-snmp/twister-out/twister.xml
+          if-no-files-found: ignore
