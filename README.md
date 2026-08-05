@@ -72,11 +72,11 @@ Request handling runs on Zephyr's shared socket service thread, so
 
 | Header                                             | Contents                                                                                              |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `lwip/apps/snmp_zephyr.h`                          | `net_snmp_agent_start()`, `net_snmp_agent_stop()`, `net_snmp_agent_trap_dst_set()` |
-| `lwip/apps/snmp.h`                                 | Agent configuration, community strings, trap destinations, trap sending           |
-| `lwip/apps/snmp_callback.h`                        | `install_snmp_handler()` for per-OID callbacks                                    |
-| `lwip/apps/snmp_mib2.h`                            | Setters for the MIB-2 system group                                                |
-| `lwip/apps/snmp_core.h`, `lwip/apps/snmp_scalar.h` | Node and MIB definition macros for private MIBs                                   |
+| `snmp/snmp_agent.h`                          | `net_snmp_agent_start()`, `net_snmp_agent_stop()`, `net_snmp_agent_trap_dst_set()` |
+| `snmp/snmp.h`                                 | Agent configuration, community strings, trap destinations, trap sending           |
+| `snmp/snmp_callback.h`                        | `install_snmp_handler()` for per-OID callbacks                                    |
+| `snmp/snmp_mib2.h`                            | Setters for the MIB-2 system group                                                |
+| `snmp/snmp_core.h`, `snmp/snmp_scalar.h`           | Node and MIB definition macros for private MIBs                                   |
 
 The agent creates no thread of its own. Zephyr's socket service delivers each
 datagram on its shared service thread, and the agent parses the request and
@@ -97,9 +97,9 @@ been assigned and answers as soon as one is.
 ```c
 #include <zephyr/kernel.h>
 
-#include <lwip/apps/snmp_opts.h>
-#include <lwip/apps/snmp.h>
-#include <lwip/apps/snmp_zephyr.h>
+#include <snmp/snmp_opts.h>
+#include <snmp/snmp.h>
+#include <snmp/snmp_agent.h>
 
 int main(void)
 {
@@ -128,19 +128,19 @@ provides its own storage. A writable field needs a buffer, a length variable
 and the buffer size. A read-only field needs only the string and its length.
 
 ```c
-#include <lwip/apps/snmp_mib2.h>
+#include <snmp/snmp_mib2.h>
 
-static const u8_t sys_descr[] = "Example gateway";
-static const u16_t sys_descr_len = sizeof(sys_descr) - 1;
+static const uint8_t sys_descr[] = "Example gateway";
+static const uint16_t sys_descr_len = sizeof(sys_descr) - 1;
 
-static u8_t sys_name[32] = "gateway-01";
-static u16_t sys_name_len = 10;
+static uint8_t sys_name[32] = "gateway-01";
+static uint16_t sys_name_len = 10;
 
-static u8_t sys_location[64] = "building 2, rack 4";
-static u16_t sys_location_len = 18;
+static uint8_t sys_location[64] = "building 2, rack 4";
+static uint16_t sys_location_len = 18;
 
-static u8_t sys_contact[64] = "ops@example.com";
-static u16_t sys_contact_len = 15;
+static uint8_t sys_contact[64] = "ops@example.com";
+static uint16_t sys_contact_len = 15;
 
 static void snmp_describe_device(void)
 {
@@ -164,7 +164,7 @@ traps. The strings have to remain valid for as long as the agent runs, so use
 string literals or static buffers.
 
 ```c
-#include <lwip/apps/snmp.h>
+#include <snmp/snmp.h>
 
 snmp_set_community("plant-floor");
 snmp_set_community_write("plant-floor-rw");
@@ -184,7 +184,7 @@ library, so it needs static lifetime.
 #include <stdlib.h>
 #include <string.h>
 
-#include <lwip/apps/snmp_callback.h>
+#include <snmp/snmp_callback.h>
 
 static int handle_uptime(const char *oid, struct snmp_handler_entry *entry)
 {
@@ -237,24 +237,24 @@ enterprise OID `1.3.6.1.4.1.12345`. Replace that number with the enterprise
 number assigned to your organization.
 
 ```c
-#include <lwip/apps/snmp.h>
-#include <lwip/apps/snmp_core.h>
-#include <lwip/apps/snmp_mib2.h>
-#include <lwip/apps/snmp_scalar.h>
+#include <snmp/snmp.h>
+#include <snmp/snmp_core.h>
+#include <snmp/snmp_mib2.h>
+#include <snmp/snmp_scalar.h>
 
-static s16_t get_uptime(struct snmp_node_instance *instance, void *value)
+static int16_t get_uptime(struct snmp_node_instance *instance, void *value)
 {
-	u32_t *result = (u32_t *)value;
+	uint32_t *result = (uint32_t *)value;
 
 	ARG_UNUSED(instance);
-	*result = (u32_t)(k_uptime_get() / 1000);
+	*result = (uint32_t)(k_uptime_get() / 1000);
 
 	return sizeof(*result);
 }
 
-static s16_t get_temperature(struct snmp_node_instance *instance, void *value)
+static int16_t get_temperature(struct snmp_node_instance *instance, void *value)
 {
-	s32_t *result = (s32_t *)value;
+	int32_t *result = (int32_t *)value;
 
 	ARG_UNUSED(instance);
 	*result = sensor_read_milli_celsius(0);
@@ -288,7 +288,7 @@ static const struct snmp_node *const private_mib_nodes[] = {
 static const struct snmp_tree_node private_mib_root =
 	SNMP_CREATE_TREE_NODE(1, private_mib_nodes);
 
-static const u32_t private_mib_base_oid[] = { 1, 3, 6, 1, 4, 1, 12345 };
+static const uint32_t private_mib_base_oid[] = { 1, 3, 6, 1, 4, 1, 12345 };
 static const struct snmp_mib private_mib =
 	SNMP_MIB_CREATE(private_mib_base_oid, &private_mib_root.node);
 
@@ -309,11 +309,11 @@ requests and traps never overlap.
 ```c
 #include <arpa/inet.h>
 
-#include <lwip/apps/snmp.h>
+#include <snmp/snmp.h>
 
 static void snmp_configure_traps(const char *manager_ip)
 {
-	ip_addr_t dst;
+	struct net_in_addr dst;
 
 	dst.addr = inet_addr(manager_ip);   /* network byte order */
 
@@ -328,7 +328,7 @@ static void snmp_report_link_up(void)
 }
 ```
 
-`net_snmp_agent_trap_dst_set("192.168.2.11")` from `snmp_zephyr.h` performs
+`net_snmp_agent_trap_dst_set("192.168.2.11")` from `snmp/snmp_agent.h` performs
 the same three configuration calls and parses the address for you, which is
 convenient while bringing a board up.
 
@@ -338,17 +338,17 @@ the varbind stay in scope until the call returns.
 ```c
 #include <string.h>
 
-static void snmp_report_over_temperature(s32_t milli_celsius)
+static void snmp_report_over_temperature(int32_t milli_celsius)
 {
-	static const u32_t temperature_oid[] = {
+	static const uint32_t temperature_oid[] = {
 		1, 3, 6, 1, 4, 1, 12345, 1, 2, 0
 	};
 	struct snmp_varbind varbind;
-	s32_t value = milli_celsius;
+	int32_t value = milli_celsius;
 
 	memset(&varbind, 0, sizeof(varbind));
 	snmp_oid_assign(&varbind.oid, temperature_oid,
-			LWIP_ARRAYSIZE(temperature_oid));
+			ARRAY_SIZE(temperature_oid));
 	varbind.type = SNMP_ASN1_TYPE_INTEGER;
 	varbind.value_len = sizeof(value);
 	varbind.object_value = &value;
@@ -358,7 +358,7 @@ static void snmp_report_over_temperature(s32_t milli_celsius)
 }
 ```
 
-`SNMP_TRAP_DESTINATIONS` in `snmp_opts.h` sets how many managers can be
+`CONFIG_SNMP_AGENT_TRAP_DESTINATIONS` sets how many managers can be
 configured, and defaults to one.
 
 ### Testing from a host
@@ -379,6 +379,22 @@ snmpwalk -v2c -c public 192.168.2.17 1
 sudo snmptrapd -f -Lo -c /dev/null
 ```
 
+## Published MIB-2 groups
+
+| Group        | Option                             | Contents                                                     |
+| ------------ | ---------------------------------- | ------------------------------------------------------------ |
+| `system`     | `CONFIG_SNMP_AGENT_MIB2_SYSTEM`     | Description, object ID, uptime, contact, name, location      |
+| `interfaces` | `CONFIG_SNMP_AGENT_MIB2_INTERFACES` | `ifNumber` and `ifTable`, from Zephyr's network interfaces    |
+| `snmp`       | `CONFIG_SNMP_AGENT_MIB2_SNMP`       | The agent's own message counters                             |
+
+The per-interface counters in `ifTable` read as zero unless
+`CONFIG_NET_STATISTICS_PER_INTERFACE` is also enabled, and every column is
+read-only.
+
+The `ip` and `udp` groups are not published. They previously returned a
+complete-looking set of zeros because they read lwIP globals this port never
+filled in; they can return backed by `net_stats` and `net_context_foreach()`.
+
 ## Notes and current limitations
 
 - Callbacks return an `int`, so they serve integer valued types such as
@@ -391,6 +407,29 @@ sudo snmptrapd -f -Lo -c /dev/null
 - Only SNMP v1 and v2c are supported.
 - IPv4 only.
 
+## Migrating from v0.0.6
+
+The agent no longer needs a thread, a message queue, or a callback from the
+application:
+
+| Before                                | Now                                |
+| ------------------------------------- | ---------------------------------- |
+| `snmp_zephyr_init(handler)`           | `net_snmp_agent_start()`           |
+| `snmp_recv_packet(id)` in your thread | nothing; handled internally        |
+| `snmp_prepare_trap_test(addr)`        | `net_snmp_agent_trap_dst_set(addr)`|
+| `#include <lwip/apps/...>`            | `#include <snmp/...>`              |
+| `CONFIG_LIB_SNMP`                     | `CONFIG_SNMP_AGENT`                |
+
+`CONFIG_POSIX_API` and `CONFIG_HEAP_MEM_POOL_SIZE` are no longer required, nor
+is a `VERSION` file in the application. `net_snmp_agent_start()` and
+`net_snmp_agent_stop()` return 0 or a negative errno, where
+`snmp_zephyr_init()` returned non-zero for success. Calls into the library may
+now come from any thread. lwIP's short types are gone from the API: use
+`uint8_t` and `uint16_t` in place of `u8_t` and `u16_t`, and
+`struct net_in_addr` in place of `ip_addr_t`.
+
 ## License
 
-BSD-3-Clause, inherited from lwIP. See [LICENSE](LICENSE).
+BSD-3-Clause, inherited from lwIP, for the agent core and everything derived
+from it. Files written for this module carry Apache-2.0. See
+[LICENSE](LICENSE).

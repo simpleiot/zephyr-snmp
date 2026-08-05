@@ -35,11 +35,15 @@
  * Author: Leon Woestenberg <leon.woestenberg@axon.tv>
  *         Martin Hentschel <info@cl-soft.de>
  *
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef LWIP_HDR_APPS_SNMP_H
-#define LWIP_HDR_APPS_SNMP_H
+#ifndef ZEPHYR_INCLUDE_SNMP_H_
+#define ZEPHYR_INCLUDE_SNMP_H_
 
 #include <snmp/snmp_opts.h>
+
+#include <zephyr/net/net_ip.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -144,4 +148,4 @@ void snmp_set_write_callback(snmp_write_callback_fct write_callback, void *callb
 }
 #endif
 
-#endif /* LWIP_HDR_APPS_SNMP_H */
+#endif /* ZEPHYR_INCLUDE_SNMP_H_ */

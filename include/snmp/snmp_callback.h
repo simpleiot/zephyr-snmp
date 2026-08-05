@@ -1,5 +1,9 @@
-#ifndef LWIP_HDR_APPS_SNMP_CALLBACK_H
-#define LWIP_HDR_APPS_SNMP_CALLBACK_H
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#ifndef ZEPHYR_INCLUDE_SNMP_CALLBACK_H_
+#define ZEPHYR_INCLUDE_SNMP_CALLBACK_H_
 
 #include <snmp/snmp_opts.h>
 
@@ -47,4 +51,4 @@ void install_snmp_handler(struct snmp_handler_entry *entry);
 } /* extern "C"  */
 #endif
 
-#endif /* LWIP_HDR_APPS_SNMP_CALLBACK_H */
+#endif /* ZEPHYR_INCLUDE_SNMP_CALLBACK_H_ */

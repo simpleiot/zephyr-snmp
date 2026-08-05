@@ -33,6 +33,8 @@
  *
  * Author: Martin Hentschel <info@cl-soft.de>
  *
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <snmp/snmp_opts.h>

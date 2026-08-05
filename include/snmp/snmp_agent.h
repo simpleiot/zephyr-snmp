@@ -9,8 +9,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef __SNMP_ZEPHYR_H
-#define __SNMP_ZEPHYR_H
+#ifndef ZEPHYR_INCLUDE_SNMP_AGENT_H_
+#define ZEPHYR_INCLUDE_SNMP_AGENT_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,4 +58,4 @@ int net_snmp_agent_trap_dst_set(const char *ip_address);
 } /* extern "C" */
 #endif
 
-#endif /* __SNMP_ZEPHYR_H */
+#endif /* ZEPHYR_INCLUDE_SNMP_AGENT_H_ */

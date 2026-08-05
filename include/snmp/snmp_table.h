@@ -33,10 +33,12 @@
  *
  * Author: Martin Hentschel <info@cl-soft.de>
  *
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef LWIP_HDR_APPS_SNMP_TABLE_H
-#define LWIP_HDR_APPS_SNMP_TABLE_H
+#ifndef ZEPHYR_INCLUDE_SNMP_TABLE_H_
+#define ZEPHYR_INCLUDE_SNMP_TABLE_H_
 
 #include <snmp/snmp_opts.h>
 #include <snmp/snmp_core.h>
@@ -148,4 +150,4 @@ int16_t snmp_table_extract_value_from_refconstptr(struct snmp_node_instance *ins
 }
 #endif
 
-#endif /* LWIP_HDR_APPS_SNMP_TABLE_H */
+#endif /* ZEPHYR_INCLUDE_SNMP_TABLE_H_ */

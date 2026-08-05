@@ -33,6 +33,8 @@
  *
  * Author: Christiaan Simons <christiaan.simons@axon.tv>
  *         Martin Hentschel <info@cl-soft.de>
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <snmp/snmp_opts.h>

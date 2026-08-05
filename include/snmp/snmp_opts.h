@@ -33,9 +33,11 @@
  *
  * Author: Dirk Ziegelmeier
  *
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef LWIP_HDR_SNMP_OPTS_H
-#define LWIP_HDR_SNMP_OPTS_H
+#ifndef ZEPHYR_INCLUDE_SNMP_OPTS_H_
+#define ZEPHYR_INCLUDE_SNMP_OPTS_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -233,4 +235,4 @@
  * @}
  */
 
-#endif /* LWIP_HDR_SNMP_OPTS_H */
+#endif /* ZEPHYR_INCLUDE_SNMP_OPTS_H_ */

@@ -34,6 +34,8 @@
  * Author: Martin Hentschel
  *         Christiaan Simons <christiaan.simons@axon.tv>
  *
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <snmp/snmp_opts.h>
@@ -280,14 +282,13 @@ static int snmp_prepare_trap_oid(struct snmp_obj_id *dest_snmp_trap_oid,
 		if (sizeof(dest_snmp_trap_oid->id) >= sizeof(snmpTrapOID)) {
 			MEMCPY(&dest_snmp_trap_oid->id, snmpTrapOID, sizeof(snmpTrapOID));
 			dest_snmp_trap_oid->len = LWIP_ARRAYSIZE(snmpTrapOID);
-			dest_snmp_trap_oid->id[dest_snmp_trap_oid->len++] = specific_trap + 1;
+			dest_snmp_trap_oid->id[dest_snmp_trap_oid->len++] = generic_trap + 1;
 		} else {
 			err = ERR_MEM;
 		}
 	} else {
 		err = ERR_VAL;
 	}
-	snmp_agent_unlock();
 
 	return err;
 }
@@ -384,6 +385,13 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 	uint32_t timestamp = 0;
 	struct snmp_varbind *original_varbinds = varbinds;
 	struct snmp_varbind *original_prev = NULL;
+	bool prev_replaced = false;
+	/* Converts the SNMPv1 generic/specific trap parameters to an SNMPv2
+	 * snmpTrapOID. This must outlive the block that fills it in: the
+	 * varbind below points at snmp_trap_oid.id, and the encoding happens
+	 * further down, in the loop over trap destinations.
+	 */
+	struct snmp_obj_id snmp_trap_oid = {0};
 	struct snmp_varbind snmp_v2_special_varbinds[] = {
 		/* First varbind is used to store sysUpTime */
 		{
@@ -431,9 +439,6 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 
 	/* see rfc3584 */
 	if (trap_msg->snmp_version == SNMP_VERSION_2c) {
-		struct snmp_obj_id snmp_trap_oid = {
-			0}; /* used for converting SNMPv1 generic/specific trap parameter to SNMPv2
-			       snmpTrapOID */
 		err = snmp_prepare_trap_oid(&snmp_trap_oid, eoid, generic_trap, specific_trap);
 		if (err == ERR_OK) {
 			snmp_v2_special_varbinds[1].value_len =
@@ -442,6 +447,7 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 			if (varbinds != NULL) {
 				original_prev = varbinds->prev;
 				varbinds->prev = &snmp_v2_special_varbinds[1];
+				prev_replaced = true;
 			}
 			varbinds = snmp_v2_special_varbinds; /* After inserting two varbinds at the
 								beginning of the list, make sure
@@ -470,7 +476,12 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 			}
 		}
 	}
-	if ((trap_msg->snmp_version == SNMP_VERSION_2c) && (original_varbinds != NULL)) {
+	/* The two special varbinds live on this stack frame, so the caller's
+	 * list must not keep pointing at them. Restore only what was replaced;
+	 * an unconditional restore cleared the caller's prev pointer when the
+	 * snmpTrapOID could not be prepared.
+	 */
+	if (prev_replaced) {
 		original_varbinds->prev = original_prev;
 	}
 	req_id++;
@@ -534,6 +545,8 @@ int snmp_send_trap_generic(int32_t generic_trap)
 	} else {
 		err = ERR_VAL;
 	}
+	snmp_agent_unlock();
+
 	return err;
 }
 

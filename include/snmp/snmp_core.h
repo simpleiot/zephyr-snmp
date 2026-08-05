@@ -31,12 +31,16 @@
  *
  * Author: Christiaan Simons <christiaan.simons@axon.tv>
  *         Martin Hentschel <info@cl-soft.de>
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef LWIP_HDR_APPS_SNMP_CORE_H
-#define LWIP_HDR_APPS_SNMP_CORE_H
+#ifndef ZEPHYR_INCLUDE_SNMP_CORE_H_
+#define ZEPHYR_INCLUDE_SNMP_CORE_H_
 
 #include <snmp/snmp_opts.h>
+
+#include <zephyr/net/net_ip.h>
 
 #if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
 
@@ -389,4 +393,4 @@ extern struct snmp_statistics snmp_stats;
 
 #endif /* LWIP_SNMP */
 
-#endif /* LWIP_HDR_APPS_SNMP_CORE_H */
+#endif /* ZEPHYR_INCLUDE_SNMP_CORE_H_ */

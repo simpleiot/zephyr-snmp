@@ -33,9 +33,11 @@
  *
  * Author: Dirk Ziegelmeier <dziegel@gmx.de>
  *
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef LWIP_HDR_APPS_SNMP_MIB2_H
-#define LWIP_HDR_APPS_SNMP_MIB2_H
+#ifndef ZEPHYR_INCLUDE_SNMP_MIB2_H_
+#define ZEPHYR_INCLUDE_SNMP_MIB2_H_
 
 #include <snmp/snmp_opts.h>
 
@@ -69,4 +71,4 @@ void snmp_mib2_set_syslocation_readonly(const uint8_t *ocstr, const uint16_t *oc
 }
 #endif
 
-#endif /* LWIP_HDR_APPS_SNMP_MIB2_H */
+#endif /* ZEPHYR_INCLUDE_SNMP_MIB2_H_ */

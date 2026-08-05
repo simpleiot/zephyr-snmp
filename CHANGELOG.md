@@ -8,6 +8,19 @@ and this project adheres to
 
 ## [unreleased]
 
+- fix the SNMPv2c trap OID, which named the wrong notification: for a generic
+  trap the last sub-identifier was built from the specific-trap parameter,
+  which `snmp_send_trap_generic()` always passes as 0, so every generic trap
+  reached the manager as `coldStart`
+- fix a use-after-scope in the trap path: the `snmpTrapOID` value was built in
+  a block-scoped variable whose address was still referenced by the varbind
+  list when the message was encoded, further down the same function
+- fix the varbind list restore in the trap path, which cleared the caller's
+  `prev` pointer when the trap OID could not be prepared
+- add SPDX identifiers throughout, keeping the lwIP copyright blocks that the
+  BSD-3-Clause license requires, and give the public headers Zephyr-style
+  include guards
+
 - document the module in README.md: adding it to a project, configuration, and
   usage examples for the agent thread, MIB-2 system group, OID callbacks,
   private MIBs, and traps

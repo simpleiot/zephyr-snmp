@@ -31,6 +31,8 @@
  *
  * Author: Dirk Ziegelmeier <dziegel@gmx.de>
  *         Christiaan Simons <christiaan.simons@axon.tv>
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 /**
