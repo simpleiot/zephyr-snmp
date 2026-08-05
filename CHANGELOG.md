@@ -59,6 +59,11 @@ and this project adheres to
 - drop the dependency on `CONFIG_POSIX_API` by using the namespaced
   networking API throughout, and the `VERSION` file requirement by dropping
   an `<app_version.h>` include that nothing used
+- back `snmp_pbuf_stream` with a flat buffer cursor and delete `src/pbuf.c`,
+  `lwip/pbuf.h`, and the `mem`/`memp` headers and stubs. Messages are encoded
+  into static buffers of `CONFIG_SNMP_AGENT_MAX_MSG_SIZE` bytes, one for
+  responses and one for traps, so nothing is allocated per packet and
+  `CONFIG_HEAP_MEM_POOL_SIZE` is no longer required
 
 ## [v0.0.6] - 2025-05-08
 

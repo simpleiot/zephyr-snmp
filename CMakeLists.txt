@@ -7,7 +7,6 @@ zephyr_library_named(snmp)
 
 zephyr_include_directories(include)
 
-zephyr_library_sources(src/pbuf.c)
 zephyr_library_sources(src/snmp_asn1.c)
 zephyr_library_sources(src/snmp_callback.c)
 zephyr_library_sources(src/snmp_core.c)

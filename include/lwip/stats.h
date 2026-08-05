@@ -41,8 +41,6 @@
 
 #include "lwip/opt.h"
 
-#include "lwip/mem.h"
-#include "lwip/memp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -102,9 +100,9 @@ struct stats_mem {
   const char *name;
 #endif /* defined(LWIP_DEBUG) || LWIP_STATS_DISPLAY */
   STAT_COUNTER err;
-  mem_size_t avail;
-  mem_size_t used;
-  mem_size_t max;
+  size_t avail;
+  size_t used;
+  size_t max;
   STAT_COUNTER illegal;
 };
 

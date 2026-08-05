@@ -43,19 +43,20 @@
 #if LWIP_SNMP
 
 #include "lwip/err.h"
-#include "lwip/pbuf.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/** A cursor over a flat buffer: @a offset is the position from @a data,
+ *  @a length the number of bytes still reachable from there. */
 struct snmp_pbuf_stream {
-  struct pbuf *pbuf;
+  u8_t *data;
   u16_t offset;
   u16_t length;
 };
 
-err_t snmp_pbuf_stream_init(struct snmp_pbuf_stream *pbuf_stream, struct pbuf *p, u16_t offset, u16_t length);
+err_t snmp_pbuf_stream_init(struct snmp_pbuf_stream *pbuf_stream, u8_t *data, u16_t offset, u16_t length);
 err_t snmp_pbuf_stream_read(struct snmp_pbuf_stream *pbuf_stream, u8_t *data);
 err_t snmp_pbuf_stream_write(struct snmp_pbuf_stream *pbuf_stream, u8_t data);
 err_t snmp_pbuf_stream_writebuf(struct snmp_pbuf_stream *pbuf_stream, const void *buf, u16_t buf_len);

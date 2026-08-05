@@ -88,38 +88,6 @@ bool snmp_agent_lock_held(void)
 }
 
 /**
- * @brief Hand one received datagram to the agent core.
- *
- * Runs with agent_lock held.
- */
-static void snmp_process_datagram(int sock, const uint8_t *data, size_t len,
-				  const struct net_sockaddr_in *from)
-{
-	struct pbuf *p;
-	ip_addr_t from_address;
-
-	p = pbuf_alloc(PBUF_TRANSPORT, len, PBUF_RAM);
-	if (p == NULL) {
-		LOG_ERR("cannot allocate a %zu byte request buffer", len);
-		return;
-	}
-
-	p->next = NULL;
-	memcpy(p->payload, data, len);
-	p->tot_len = len;
-	p->len = len;
-	p->ref = 1;
-
-	from_address.addr = from->sin_addr.s_addr;
-
-	/* The socket is passed as an opaque handle because that is what the
-	 * agent core hands back to snmp_sendto() when it wants to reply. */
-	snmp_receive((void *)(intptr_t)sock, p, &from_address, from->sin_port);
-
-	pbuf_free(p);
-}
-
-/**
  * @brief Socket service callback, run on Zephyr's shared service thread.
  *
  * Requests are parsed and answered here rather than being queued for an
@@ -171,7 +139,17 @@ static void snmp_service_cb(struct net_socket_service_event *evt)
 			net_ntohs(from.sin_port));
 	}
 
-	snmp_process_datagram(evt->event.fd, recv_buf, (size_t)ret, &from);
+	{
+		ip_addr_t from_address;
+
+		from_address.addr = from.sin_addr.s_addr;
+
+		/* The socket is passed as an opaque handle because that is
+		 * what the agent core hands back to snmp_sendto() when it
+		 * wants to reply. */
+		snmp_receive((void *)(intptr_t)evt->event.fd, recv_buf, (u16_t)ret,
+			     &from_address, from.sin_port);
+	}
 
 unlock:
 	snmp_agent_unlock();
@@ -302,11 +280,13 @@ int net_snmp_agent_trap_dst_set(const char *ip_address)
  * @brief Send one encoded message, called by the agent core.
  *
  * @param handle The socket the request arrived on, as an opaque value.
- * @param p      The encoded message.
+ * @param data   The encoded message.
+ * @param len    Its length in bytes.
  * @param dst    Destination address.
  * @param port   Destination port, in network byte order.
  */
-err_t snmp_sendto(void *handle, struct pbuf *p, const ip_addr_t *dst, u16_t port)
+err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const ip_addr_t *dst,
+		  u16_t port)
 {
 	struct net_sockaddr_in to = {
 		.sin_family = NET_AF_INET,
@@ -317,7 +297,7 @@ err_t snmp_sendto(void *handle, struct pbuf *p, const ip_addr_t *dst, u16_t port
 
 	to.sin_addr.s_addr = dst->addr;
 
-	ret = zsock_sendto(sock, p->payload, p->len, 0,
+	ret = zsock_sendto(sock, data, len, 0,
 			   (struct net_sockaddr *)&to, sizeof(to));
 	if (ret < 0) {
 		LOG_ERR("sendto failed, errno %d", errno);
@@ -334,40 +314,6 @@ u8_t snmp_get_local_ip_for_dst(void *handle, const ip_addr_t *dst, ip_addr_t *re
 	ip_addr_copy(*result, *dst);
 
 	return 1;
-}
-
-/* As part of the Zephyr port, the agent's memory allocation is mapped onto
- * the kernel heap. */
-void *mem_malloc(mem_size_t size)
-{
-	return k_malloc(size);
-}
-
-void mem_free(void *rmem)
-{
-	k_free(rmem);
-}
-
-void *mem_trim(void *rmem, mem_size_t newsize)
-{
-	(void)newsize;
-
-	return rmem;
-}
-
-void *memp_malloc(memp_t type)
-{
-	(void)type;
-	__ASSERT(false, "memp_malloc() should not be called");
-
-	return NULL;
-}
-
-void memp_free(memp_t type, void *mem)
-{
-	(void)type;
-	(void)mem;
-	__ASSERT(false, "memp_free() should not be called");
 }
 
 u32_t sys_now(void)

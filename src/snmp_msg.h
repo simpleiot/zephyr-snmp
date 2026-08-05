@@ -71,7 +71,7 @@ typedef enum {
   SNMP_VB_ENUMERATOR_ERR_INVALIDLENGTH = 3
 } snmp_vb_enumerator_err_t;
 
-void snmp_vb_enumerator_init(struct snmp_varbind_enumerator *enumerator, struct pbuf *p, u16_t offset, u16_t length);
+void snmp_vb_enumerator_init(struct snmp_varbind_enumerator *enumerator, u8_t *data, u16_t offset, u16_t length);
 snmp_vb_enumerator_err_t snmp_vb_enumerator_get_next(struct snmp_varbind_enumerator *enumerator, struct snmp_varbind *varbind);
 
 #define SNMP_MAX_COMMUNITY_SIZE 12U
@@ -106,13 +106,17 @@ struct snmp_request {
   u8_t request_out_type;
 
 
-  struct pbuf *inbound_pbuf;
+  u8_t *inbound_buf;
+  u16_t inbound_len;
   struct snmp_varbind_enumerator inbound_varbind_enumerator;
   u16_t inbound_varbind_offset;
   u16_t inbound_varbind_len;
   u16_t inbound_padding_len;
 
-  struct pbuf *outbound_pbuf;
+  u8_t *outbound_buf;
+  u16_t outbound_buf_size;
+  /** Set once the frame is complete; the number of bytes to send. */
+  u16_t outbound_len;
   struct snmp_pbuf_stream outbound_pbuf_stream;
   u16_t outbound_pdu_offset;
   u16_t outbound_error_status_offset;
@@ -143,8 +147,8 @@ extern const char *snmp_community_write;
 /** handle for sending traps */
 extern void *snmp_traps_handle;
 
-void snmp_receive(void *handle, struct pbuf *p, const ip_addr_t *source_ip, u16_t port);
-err_t snmp_sendto(void *handle, struct pbuf *p, const ip_addr_t *dst, u16_t port);
+void snmp_receive(void *handle, u8_t *data, u16_t len, const ip_addr_t *source_ip, u16_t port);
+err_t snmp_sendto(void *handle, const u8_t *data, u16_t len, const ip_addr_t *dst, u16_t port);
 u8_t snmp_get_local_ip_for_dst(void *handle, const ip_addr_t *dst, ip_addr_t *result);
 err_t snmp_varbind_length(struct snmp_varbind *varbind, struct snmp_varbind_len *len);
 err_t snmp_append_outbound_varbind(struct snmp_pbuf_stream *pbuf_stream, struct snmp_varbind *varbind);

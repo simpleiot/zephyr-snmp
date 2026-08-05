@@ -44,11 +44,11 @@
 #include <string.h>
 
 err_t
-snmp_pbuf_stream_init(struct snmp_pbuf_stream *pbuf_stream, struct pbuf *p, u16_t offset, u16_t length)
+snmp_pbuf_stream_init(struct snmp_pbuf_stream *pbuf_stream, u8_t *data, u16_t offset, u16_t length)
 {
   pbuf_stream->offset = offset;
   pbuf_stream->length = length;
-  pbuf_stream->pbuf   = p;
+  pbuf_stream->data   = data;
 
   return ERR_OK;
 }
@@ -60,9 +60,7 @@ snmp_pbuf_stream_read(struct snmp_pbuf_stream *pbuf_stream, u8_t *data)
     return ERR_BUF;
   }
 
-  if (pbuf_copy_partial(pbuf_stream->pbuf, data, 1, pbuf_stream->offset) == 0) {
-    return ERR_BUF;
-  }
+  *data = pbuf_stream->data[pbuf_stream->offset];
 
   pbuf_stream->offset++;
   pbuf_stream->length--;
@@ -83,9 +81,7 @@ snmp_pbuf_stream_writebuf(struct snmp_pbuf_stream *pbuf_stream, const void *buf,
     return ERR_BUF;
   }
 
-  if (pbuf_take_at(pbuf_stream->pbuf, buf, buf_len, pbuf_stream->offset) != ERR_OK) {
-    return ERR_BUF;
-  }
+  memcpy(&pbuf_stream->data[pbuf_stream->offset], buf, buf_len);
 
   pbuf_stream->offset += buf_len;
   pbuf_stream->length -= buf_len;
@@ -96,7 +92,6 @@ snmp_pbuf_stream_writebuf(struct snmp_pbuf_stream *pbuf_stream, const void *buf,
 err_t
 snmp_pbuf_stream_writeto(struct snmp_pbuf_stream *pbuf_stream, struct snmp_pbuf_stream *target_pbuf_stream, u16_t len)
 {
-
   if ((pbuf_stream == NULL) || (target_pbuf_stream == NULL)) {
     return ERR_ARG;
   }
@@ -108,26 +103,16 @@ snmp_pbuf_stream_writeto(struct snmp_pbuf_stream *pbuf_stream, struct snmp_pbuf_
     len = LWIP_MIN(pbuf_stream->length, target_pbuf_stream->length);
   }
 
-  while (len > 0) {
-    u16_t chunk_len;
-    err_t err;
-    u16_t target_offset;
-    struct pbuf *pbuf = pbuf_skip(pbuf_stream->pbuf, pbuf_stream->offset, &target_offset);
-
-    if ((pbuf == NULL) || (pbuf->len == 0)) {
-      return ERR_BUF;
-    }
-
-    chunk_len = LWIP_MIN(len, pbuf->len);
-    err = snmp_pbuf_stream_writebuf(target_pbuf_stream, &((u8_t *)pbuf->payload)[target_offset], chunk_len);
+  {
+    err_t err = snmp_pbuf_stream_writebuf(target_pbuf_stream,
+                                          &pbuf_stream->data[pbuf_stream->offset], len);
     if (err != ERR_OK) {
       return err;
     }
-
-    pbuf_stream->offset   += chunk_len;
-    pbuf_stream->length   -= chunk_len;
-    len -= chunk_len;
   }
+
+  pbuf_stream->offset += len;
+  pbuf_stream->length -= len;
 
   return ERR_OK;
 }

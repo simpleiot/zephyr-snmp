@@ -126,6 +126,10 @@ struct snmp_trap_dst
 };
 static struct snmp_trap_dst trap_dst[SNMP_TRAP_DESTINATIONS];
 
+/** Where traps are encoded. Separate from the response buffer so that a trap
+ *  raised while a request is being answered cannot overwrite the reply. */
+static u8_t snmp_trap_buf[CONFIG_SNMP_AGENT_MAX_MSG_SIZE];
+
 static u8_t snmp_auth_traps_enabled = 0;
 
 /* This is used in functions like snmp_coldstart_trap where user didn't specify which version of trap to use */
@@ -326,34 +330,27 @@ snmp_prepare_necessary_msg_fields(struct snmp_msg_trap *trap_msg, const struct s
 static err_t
 snmp_send_msg(struct snmp_msg_trap *trap_msg, struct snmp_varbind *varbinds, u16_t tot_len, ip_addr_t *dip)
 {
-  int rc;
   err_t err = ERR_OK;
-  struct pbuf *p = NULL;
-  /* allocate pbuf(s) */
-  p = pbuf_alloc(PBUF_TRANSPORT, tot_len, PBUF_RAM);
-  if (p != NULL) {
-    struct snmp_pbuf_stream pbuf_stream;
-    snmp_pbuf_stream_init(&pbuf_stream, p, 0, tot_len);
+  struct snmp_pbuf_stream pbuf_stream;
+  /* snmp_sendto() wants a network-endian port number. */
+  u16_t port = net_htons(CONFIG_SNMP_AGENT_TRAP_PORT);
 
-    /* pass 1, encode packet ino the pbuf(s) */
-    BUILD_EXEC( snmp_trap_header_enc(trap_msg, &pbuf_stream) );
-    BUILD_EXEC( snmp_trap_varbind_enc(trap_msg, &pbuf_stream, varbinds) );
-
-    snmp_stats.outtraps++;
-    snmp_stats.outpkts++;
-
-    /* snmp_sendto() wants a network-endian port number. */
-    u16_t port = net_htons(CONFIG_SNMP_AGENT_TRAP_PORT);
-    /** send to the TRAP destination */
-    rc = snmp_sendto(snmp_traps_handle, p, dip, port);
-    if (rc <= 0) {
-		err = ERR_CONN;
-	}
-    pbuf_free(p);
-  } else {
-	LOG_ERR("snmp_send_msg: cannot allocate a %u byte trap buffer", (unsigned)tot_len);
-    err = ERR_MEM;
+  if (tot_len > sizeof(snmp_trap_buf)) {
+    LOG_ERR("trap needs %u bytes, CONFIG_SNMP_AGENT_MAX_MSG_SIZE is %u",
+            (unsigned)tot_len, (unsigned)sizeof(snmp_trap_buf));
+    return ERR_MEM;
   }
+
+  snmp_pbuf_stream_init(&pbuf_stream, snmp_trap_buf, 0, tot_len);
+
+  BUILD_EXEC( snmp_trap_header_enc(trap_msg, &pbuf_stream) );
+  BUILD_EXEC( snmp_trap_varbind_enc(trap_msg, &pbuf_stream, varbinds) );
+
+  snmp_stats.outtraps++;
+  snmp_stats.outpkts++;
+
+  err = snmp_sendto(snmp_traps_handle, snmp_trap_buf, tot_len, dip, port);
+
   return err;
 }
 

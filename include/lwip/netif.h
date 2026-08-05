@@ -46,7 +46,6 @@
 #include "lwip/ip_addr.h"
 
 #include "lwip/def.h"
-#include "lwip/pbuf.h"
 #include "lwip/stats.h"
 
 #ifdef __cplusplus

@@ -55,9 +55,6 @@ CONFIG_NETWORKING=y
 CONFIG_NET_IPV4=y
 CONFIG_NET_UDP=y
 
-# The agent allocates packet buffers with k_malloc()
-CONFIG_HEAP_MEM_POOL_SIZE=4096
-
 CONFIG_LOG=y
 ```
 
