@@ -383,9 +383,6 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 	uint16_t tot_len = 0;
 	int err = ERR_OK;
 	uint32_t timestamp = 0;
-	struct snmp_varbind *original_varbinds = varbinds;
-	struct snmp_varbind *original_prev = NULL;
-	bool prev_replaced = false;
 	/* Converts the SNMPv1 generic/specific trap parameters to an SNMPv2
 	 * snmpTrapOID. This must outlive the block that fills it in: the
 	 * varbind below points at snmp_trap_oid.id, and the encoding happens
@@ -431,8 +428,6 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 	LWIP_ASSERT_SNMP_LOCKED();
 
 	snmp_v2_special_varbinds[0].next = &snmp_v2_special_varbinds[1];
-	snmp_v2_special_varbinds[1].prev = &snmp_v2_special_varbinds[0];
-
 	snmp_v2_special_varbinds[0].object_value = &timestamp;
 
 	snmp_v2_special_varbinds[1].next = varbinds;
@@ -444,15 +439,12 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 			snmp_v2_special_varbinds[1].value_len =
 				snmp_trap_oid.len * sizeof(snmp_trap_oid.id[0]);
 			snmp_v2_special_varbinds[1].object_value = snmp_trap_oid.id;
-			if (varbinds != NULL) {
-				original_prev = varbinds->prev;
-				varbinds->prev = &snmp_v2_special_varbinds[1];
-				prev_replaced = true;
-			}
-			varbinds = snmp_v2_special_varbinds; /* After inserting two varbinds at the
-								beginning of the list, make sure
-								that pointer is pointing to the
-								first element  */
+			/* The two special varbinds now head the list the caller
+			 * supplied. Only the forward links are set: the caller's
+			 * varbinds keep whatever prev they arrived with, so no
+			 * address of this stack frame escapes the function.
+			 */
+			varbinds = snmp_v2_special_varbinds;
 		}
 	}
 
@@ -475,14 +467,6 @@ static int snmp_send_trap_or_notification_or_inform_generic(struct snmp_msg_trap
 				err = ERR_RTE;
 			}
 		}
-	}
-	/* The two special varbinds live on this stack frame, so the caller's
-	 * list must not keep pointing at them. Restore only what was replaced;
-	 * an unconditional restore cleared the caller's prev pointer when the
-	 * snmpTrapOID could not be prepared.
-	 */
-	if (prev_replaced) {
-		original_varbinds->prev = original_prev;
 	}
 	req_id++;
 	return err;

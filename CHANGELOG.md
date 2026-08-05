@@ -15,8 +15,14 @@ and this project adheres to
 - fix a use-after-scope in the trap path: the `snmpTrapOID` value was built in
   a block-scoped variable whose address was still referenced by the varbind
   list when the message was encoded, further down the same function
-- fix the varbind list restore in the trap path, which cleared the caller's
-  `prev` pointer when the trap OID could not be prepared
+- stop rewriting the caller's varbind list when sending a trap. The agent
+  prepended its two special varbinds by pointing the caller's `prev` at a
+  local array and then putting the old value back, which published the
+  address of a stack frame into memory the application owns and cleared that
+  pointer outright when the trap OID could not be prepared. Varbind lists are
+  only ever walked forward, so the backward link is not needed and is no
+  longer written; `struct snmp_varbind` keeps the `prev` field for source
+  compatibility, and the agent never reads it
 - add SPDX identifiers throughout, keeping the lwIP copyright blocks that the
   BSD-3-Clause license requires, and give the public headers Zephyr-style
   include guards
