@@ -56,23 +56,6 @@
 #include "lwip/apps/snmp_mib2.h"
 #include "lwip/apps/snmp_scalar.h"
 
-#if SNMP_USE_NETCONN
-#include "lwip/tcpip.h"
-#include "lwip/priv/tcpip_priv.h"
-void
-snmp_mib2_lwip_synchronizer(snmp_threadsync_called_fn fn, void *arg)
-{
-#if LWIP_TCPIP_CORE_LOCKING
-  LOCK_TCPIP_CORE();
-  fn(arg);
-  UNLOCK_TCPIP_CORE();
-#else
-  tcpip_callback(fn, arg);
-#endif
-}
-
-struct snmp_threadsync_instance snmp_mib2_lwip_locks;
-#endif
 
 /* dot3 and EtherLike MIB not planned. (transmission .1.3.6.1.2.1.10) */
 /* historical (some say hysterical). (cmot .1.3.6.1.2.1.9) */

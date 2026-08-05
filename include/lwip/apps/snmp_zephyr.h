@@ -4,6 +4,7 @@
  */
 
 #ifndef __SNMP_ZEPHYR_H
+#define __SNMP_ZEPHYR_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,8 +38,6 @@ extern void snmp_recv_packet(int packet_id);
  */
 extern void snmp_prepare_trap_test(const char *ip_address);
 
-void snmp_install_handlers(void);
-
 /**
  * @brief Converts an array of integeres to a human-readable
  *        character string, representing the OID.
@@ -49,7 +48,7 @@ void snmp_install_handlers(void);
 const char *print_oid(size_t oid_len, const u32_t *oid_words);
 
 size_t zephyr_log( const char * format, ... )
-#ifdef _GNUC_
+#ifdef __GNUC__
 	__attribute__ ((format (printf, 1, 2)))
 #endif
 ;

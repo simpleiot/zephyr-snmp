@@ -11,6 +11,14 @@ and this project adheres to
 - document the module in README.md: adding it to a project, configuration, and
   usage examples for the agent thread, MIB-2 system group, OID callbacks,
   private MIBs, and traps
+- add samples/agent, a runnable agent application for native_sim and real
+  boards, discoverable by twister through zephyr/module.yml
+- fix the build against Zephyr 4.4 by using the namespaced socket types
+  (struct zsock_pollfd, ZSOCK_POLLIN) in snmp_zephyr.c
+- adopt Zephyr's .clang-format, .checkpatch.conf, and .editorconfig
+- remove code that was never reachable in this port: the SNMPv3 and USM
+  sources, the lwIP netconn and raw transports, thread synchronization, the
+  MIB-2 icmp and tcp groups, and the conditional regions that selected them
 
 ## [v0.0.6] - 2025-05-08
 

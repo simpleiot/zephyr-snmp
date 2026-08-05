@@ -45,11 +45,7 @@ extern "C" {
 #endif
 
 #if !defined LWIP_ASSERT_SNMP_LOCKED
-#if SNMP_USE_RAW
-#define LWIP_ASSERT_SNMP_LOCKED() LWIP_ASSERT_CORE_LOCKED()
-#else
 #define LWIP_ASSERT_SNMP_LOCKED()
-#endif
 #endif
 
 /* (outdated) SNMPv1 error codes

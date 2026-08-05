@@ -53,7 +53,6 @@
 #include <lwip/apps/snmp_opts.h>
 #include <lwip/apps/snmp_zephyr.h>
 
-#if LWIP_SNMP && SNMP_USE_ZEPHYR
 
 	#include "lwip/ip.h"
 	#include "lwip/udp.h"
@@ -252,7 +251,7 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 	{
 		static int packet_id = 0;
 		SRecvPacket * recv = &recvPackets[packet_id];
-		struct pollfd *pfd = &pev->event;
+		struct zsock_pollfd *pfd = &pev->event;
 		socklen_t addrlen = sizeof(recv->addr);
 		ssize_t len;
 		/* It looks like we *have to* read the received data.
@@ -313,15 +312,15 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 					socket_set.socket_162 = -1;
 				}
 			} else {
-				static struct pollfd fds[2];
-				
+				static struct zsock_pollfd fds[2];
+
 				// Configure pollfd for UDP socket 161
 				fds[0].fd = socket_set.socket_161;
-				fds[0].events = POLLIN;
-				
+				fds[0].events = ZSOCK_POLLIN;
+
 				// Configure pollfd for UDP socket 162
 				fds[1].fd = socket_set.socket_162;
-				fds[1].events = POLLIN;
+				fds[1].events = ZSOCK_POLLIN;
 
 				int ret = net_socket_service_register(&service_udp, fds, ARRAY_SIZE(fds), NULL);
 				zephyr_log("net_socket_service_register: rc %d\n", ret);
@@ -411,7 +410,6 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(service_udp, udp_service_handler, MAX_SERV
 		return k_uptime_get();
 	}
 
-#endif /* LWIP_SNMP && SNMP_USE_ZEPHYR */
 
 size_t zephyr_log( const char * format,
 				 ... )
@@ -459,16 +457,3 @@ const char * print_oid (size_t oid_len, const u32_t *oid_words)
 	return buf;
 }
 
-/* Use this function while stepping through the lwIP code. */
-const char *leafNodeName (unsigned aType)
-{
-	switch (aType) {
-	case SNMP_NODE_TREE:         return "Tree";         // 0x00
-/* predefined leaf node types */
-	case SNMP_NODE_SCALAR:       return "Scalar";       // 0x01
-	case SNMP_NODE_SCALAR_ARRAY: return "Scalar-array"; // 0x02
-	case SNMP_NODE_TABLE:        return "Table";        // 0x03
-	case SNMP_NODE_THREADSYNC:   return "Threadsync";   // 0x04
-	}
-	return "Unknown";
-}

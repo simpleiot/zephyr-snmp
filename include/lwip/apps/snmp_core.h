@@ -163,7 +163,6 @@ SNMP MIB node types
 #define SNMP_NODE_SCALAR       0x01
 #define SNMP_NODE_SCALAR_ARRAY 0x02
 #define SNMP_NODE_TABLE        0x03
-#define SNMP_NODE_THREADSYNC   0x04
 
 /** node "base class" layout, the mandatory fields for a node  */
 struct snmp_node
@@ -357,14 +356,6 @@ struct snmp_statistics
   u32_t outsetrequests;
   u32_t outgetresponses;
   u32_t outtraps;
-#if LWIP_SNMP_V3
-  u32_t unsupportedseclevels;
-  u32_t notintimewindows;
-  u32_t unknownusernames;
-  u32_t unknownengineids;
-  u32_t wrongdigests;
-  u32_t decryptionerrors;
-#endif
 };
 
 extern struct snmp_statistics snmp_stats;

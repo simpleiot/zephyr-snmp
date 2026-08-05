@@ -77,9 +77,6 @@
 #include "lwip/memp.h"
 #include "lwip/sys.h"
 #include "lwip/netif.h"
-#if LWIP_TCP && TCP_QUEUE_OOSEQ
-	#include "lwip/priv/tcp_priv.h"
-#endif
 #if LWIP_CHECKSUM_ON_COPY
 	#include "lwip/inet_chksum.h"
 #endif
