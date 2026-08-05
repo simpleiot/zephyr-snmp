@@ -8,6 +8,11 @@ and this project adheres to
 
 ## [unreleased]
 
+- publish a GitHub release when a `v*` tag is pushed, with the body taken from
+  this file by `scripts/extract-changelog.sh`. Nothing is built, since the
+  module compiles only as part of an application; move the `[unreleased]`
+  heading to `[vX.Y.Z] - <date>` before tagging so the notes have a section to
+  come from
 - demonstrate writes in samples/agent: the sample installs a write callback
   and prints each value a manager changes, and prints the `snmpset` command
   to try on startup. The sample README covers which objects are writable and

@@ -107,6 +107,9 @@ function that reads or writes agent state must take it too.
 - Keep the lwIP copyright block on any file that descends from lwIP; the
   license requires it. Add `SPDX-License-Identifier` alongside.
 - Update `CHANGELOG.md` (Keep a Changelog format, semver tags) under
-  `[unreleased]` for user-visible changes.
+  `[unreleased]` for user-visible changes. To cut a release, rename that
+  heading to `[vX.Y.Z] - <date>` and push the matching tag;
+  `.github/workflows/release.yml` publishes a GitHub release whose body comes
+  from that section by way of `scripts/extract-changelog.sh`.
 - The README is the reference for the public API and usage patterns; keep it
   in sync when the API surface changes.
