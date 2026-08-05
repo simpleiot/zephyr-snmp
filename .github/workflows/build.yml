@@ -33,10 +33,14 @@ jobs:
 
       # Creates the workspace around the checkout from the module's own
       # west.yml, and installs the toolchain and Python requirements.
+      # "west init -l" puts the workspace at the parent of app-path, so
+      # app-path is a single directory and base-path holds the rest: the
+      # workspace ends up at modules/lib, matching self.path in west.yml.
       - name: Set up Zephyr
         uses: zephyrproject-rtos/action-zephyr-setup@v1
         with:
-          app-path: modules/lib/zephyr-snmp
+          base-path: modules/lib
+          app-path: zephyr-snmp
           toolchains: x86_64-zephyr-elf
 
       # Builds every configuration in samples/agent/sample.yaml, which covers
@@ -61,8 +65,9 @@ jobs:
         run: |
           git config --global --add safe.directory "$PWD"
           base="${BASE_SHA:-HEAD~1}"
+          zephyr_base="$(west list -f '{abspath}' zephyr)"
           git diff "$base"..HEAD | \
-            "$GITHUB_WORKSPACE/zephyr/scripts/checkpatch.pl" --no-tree -
+            "$zephyr_base/scripts/checkpatch.pl" --no-tree -
 
       - name: Upload results
         if: always()
