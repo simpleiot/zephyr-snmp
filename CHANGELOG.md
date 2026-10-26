@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [unreleased]
 
+## [v0.1.1] - 2026-10-26
+
 ### Added
 
 - **Private MIB in the sample** — `samples/agent` now serves its uptime object
