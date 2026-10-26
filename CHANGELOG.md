@@ -8,6 +8,18 @@ and this project adheres to
 
 ## [unreleased]
 
+### Added
+
+- **Private MIB in the sample** — `samples/agent` now serves its uptime object
+  under the enterprise OID, so it shows how to add device-specific objects.
+
+### Fixed
+
+- **Private MIBs compile in applications** — the tree, MIB, scalar array, and
+  table node macros, and the README example, no longer depend on a macro that
+  was visible only inside the library
+  ([#15](https://github.com/simpleiot/zephyr-snmp/issues/15)).
+
 ## [v0.1.0] - 2026-08-05
 
 The agent now runs on Zephyr's own primitives throughout: Zephyr sockets, the

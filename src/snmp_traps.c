@@ -283,7 +283,7 @@ static int snmp_prepare_trap_oid(struct snmp_obj_id *dest_snmp_trap_oid,
 		   (generic_trap < SNMP_GENTRAP_ENTERPRISE_SPECIFIC)) {
 		if (sizeof(dest_snmp_trap_oid->id) >= sizeof(snmpTrapOID)) {
 			MEMCPY(&dest_snmp_trap_oid->id, snmpTrapOID, sizeof(snmpTrapOID));
-			dest_snmp_trap_oid->len = LWIP_ARRAYSIZE(snmpTrapOID);
+			dest_snmp_trap_oid->len = ARRAY_SIZE(snmpTrapOID);
 			dest_snmp_trap_oid->id[dest_snmp_trap_oid->len++] = generic_trap + 1;
 		} else {
 			err = ERR_MEM;

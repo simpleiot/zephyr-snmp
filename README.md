@@ -352,7 +352,7 @@ static const struct snmp_mib *device_mibs[] = { &mib2, &private_mib };
 
 static void snmp_register_private_mib(void)
 {
-	snmp_set_mibs(device_mibs, LWIP_ARRAYSIZE(device_mibs));
+	snmp_set_mibs(device_mibs, ARRAY_SIZE(device_mibs));
 }
 ```
 
