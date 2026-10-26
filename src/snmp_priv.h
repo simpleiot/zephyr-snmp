@@ -72,7 +72,6 @@ extern "C" {
 
 #define LWIP_MIN(x, y)     MIN(x, y)
 #define LWIP_MAX(x, y)     MAX(x, y)
-#define LWIP_ARRAYSIZE(x)  ARRAY_SIZE(x)
 #define LWIP_UNUSED_ARG(x) ARG_UNUSED(x)
 
 #define MEMCPY(dst, src, len) memcpy(dst, src, len)

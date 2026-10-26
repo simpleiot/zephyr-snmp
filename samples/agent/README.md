@@ -29,6 +29,14 @@ snmpget -v2c -c public localhost:1161 1.3.6.1.2.1.1.1.0
 snmpwalk -v2c -c public localhost:1161 1
 ```
 
+Besides MIB-2, the sample registers a small private MIB with one object,
+seconds since boot, under the enterprise the agent publishes as
+`sysObjectID`. It shows the node macros a device uses to add its own objects:
+
+```sh
+snmpget -v2c -c public localhost:1161 1.3.6.1.4.1.62530.1.1.0
+```
+
 The overlay works by offloading sockets: the application's socket calls go
 straight to the host rather than through Zephyr's IP stack. Two things
 follow from that. The interfaces table describes the offloaded pseudo

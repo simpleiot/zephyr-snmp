@@ -16,7 +16,9 @@
 
 #include <snmp/snmp_opts.h>
 #include <snmp/snmp.h>
+#include <snmp/snmp_core.h>
 #include <snmp/snmp_mib2.h>
+#include <snmp/snmp_scalar.h>
 #include <snmp/snmp_agent.h>
 
 /*
@@ -94,17 +96,57 @@ static void snmp_value_written(const uint32_t *oid, uint8_t oid_len, void *callb
 }
 
 /*
- * The object this sample reports in its enterprise-specific trap: seconds
- * since boot, under the enterprise the agent publishes as sysObjectID. A real
- * device uses the enterprise number IANA assigned to it, and defines the
- * object in its own MIB so a manager can name it.
+ * A private MIB with one object: seconds since boot, under the enterprise the
+ * agent publishes as sysObjectID. A real device uses the enterprise number
+ * IANA assigned to it, and defines the object in its own MIB so a manager can
+ * name it. The same object is reported in this sample's enterprise-specific
+ * trap.
  */
+static int32_t sample_uptime_seconds(void)
+{
+	return (int32_t)(k_uptime_get() / MSEC_PER_SEC);
+}
+
+static int16_t sample_get_uptime(struct snmp_node_instance *instance, void *value)
+{
+	int32_t *result = value;
+
+	ARG_UNUSED(instance);
+	*result = sample_uptime_seconds();
+
+	return sizeof(*result);
+}
+
+/* .1.3.6.1.4.1.<enterprise>.1.1.0 */
+static const struct snmp_scalar_node sample_uptime_node =
+	SNMP_SCALAR_CREATE_NODE_READONLY(1, SNMP_ASN1_TYPE_INTEGER, sample_get_uptime);
+
+static const struct snmp_node *const sample_group_nodes[] = {
+	&sample_uptime_node.node.node,
+};
+
+static const struct snmp_tree_node sample_group = SNMP_CREATE_TREE_NODE(1, sample_group_nodes);
+
+static const struct snmp_node *const sample_mib_nodes[] = {
+	&sample_group.node,
+};
+
+/* Matching starts at the base OID, so the root node's own identifier is unused. */
+static const struct snmp_tree_node sample_mib_root = SNMP_CREATE_TREE_NODE(1, sample_mib_nodes);
+
+static const uint32_t sample_mib_base_oid[] = {1, 3, 6, 1, 4, 1, SNMP_LWIP_ENTERPRISE_OID};
+static const struct snmp_mib sample_mib =
+	SNMP_MIB_CREATE(sample_mib_base_oid, &sample_mib_root.node);
+
+/* Keep mib2 in the list so the standard tree stays available. */
+static const struct snmp_mib *sample_mibs[] = {&mib2, &sample_mib};
+
 static const uint32_t sample_uptime_oid[] = {1, 3, 6, 1, 4, 1, SNMP_LWIP_ENTERPRISE_OID, 1, 1, 0};
 
 static void snmp_send_sample_trap(struct k_work *work)
 {
 	struct snmp_varbind varbind;
-	int32_t seconds = (int32_t)(k_uptime_get() / MSEC_PER_SEC);
+	int32_t seconds = sample_uptime_seconds();
 	int ret;
 
 	/*
@@ -162,6 +204,7 @@ int main(void)
 	int ret;
 
 	snmp_describe_device();
+	snmp_set_mibs(sample_mibs, ARRAY_SIZE(sample_mibs));
 	snmp_set_write_callback(snmp_value_written, NULL);
 
 	/* The socket binds to any address, so there is no need to wait for

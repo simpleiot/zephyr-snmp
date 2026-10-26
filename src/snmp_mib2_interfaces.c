@@ -108,7 +108,7 @@ static snmp_err_t interfaces_Table_get_cell_instance(const uint32_t *column,
 
 	/* check if incoming OID length and if values are in plausible range */
 	if (!snmp_oid_in_range(row_oid, row_oid_len, interfaces_Table_oid_ranges,
-			       LWIP_ARRAYSIZE(interfaces_Table_oid_ranges))) {
+			       ARRAY_SIZE(interfaces_Table_oid_ranges))) {
 		return SNMP_ERR_NOSUCHINSTANCE;
 	}
 
@@ -130,12 +130,11 @@ struct interfaces_next_ctx {
 static void interfaces_next_cb(struct net_if *iface, void *user_data)
 {
 	struct interfaces_next_ctx *ctx = user_data;
-	uint32_t test_oid[LWIP_ARRAYSIZE(interfaces_Table_oid_ranges)];
+	uint32_t test_oid[ARRAY_SIZE(interfaces_Table_oid_ranges)];
 
 	test_oid[0] = (uint32_t)net_if_get_by_iface(iface);
 
-	snmp_next_oid_check(ctx->state, test_oid, LWIP_ARRAYSIZE(interfaces_Table_oid_ranges),
-			    iface);
+	snmp_next_oid_check(ctx->state, test_oid, ARRAY_SIZE(interfaces_Table_oid_ranges), iface);
 }
 
 static snmp_err_t interfaces_Table_get_next_cell_instance(const uint32_t *column,
@@ -144,12 +143,12 @@ static snmp_err_t interfaces_Table_get_next_cell_instance(const uint32_t *column
 {
 	struct snmp_next_oid_state state;
 	struct interfaces_next_ctx ctx = {.state = &state};
-	uint32_t result_temp[LWIP_ARRAYSIZE(interfaces_Table_oid_ranges)];
+	uint32_t result_temp[ARRAY_SIZE(interfaces_Table_oid_ranges)];
 
 	LWIP_UNUSED_ARG(column);
 
 	snmp_next_oid_init(&state, row_oid->id, row_oid->len, result_temp,
-			   LWIP_ARRAYSIZE(interfaces_Table_oid_ranges));
+			   ARRAY_SIZE(interfaces_Table_oid_ranges));
 
 	net_if_foreach(interfaces_next_cb, &ctx);
 
