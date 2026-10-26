@@ -20,6 +20,15 @@ and this project adheres to
   was visible only inside the library
   ([#15](https://github.com/simpleiot/zephyr-snmp/issues/15)).
 
+### Removed
+
+- **Functions that could never link** — `snmp_init()` and the
+  `snmp_v1/v2c/v3_enable()` and `snmp_vX_enabled()` functions had declarations
+  but no definitions, so calling one failed at link time. Start the agent with
+  `net_snmp_agent_start()`; v1 and v2c are always enabled. CI now checks that
+  every public function is defined
+  ([#16](https://github.com/simpleiot/zephyr-snmp/issues/16)).
+
 ## [v0.1.0] - 2026-08-05
 
 The agent now runs on Zephyr's own primitives throughout: Zephyr sockets, the

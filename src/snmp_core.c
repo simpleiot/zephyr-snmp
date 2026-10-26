@@ -172,7 +172,8 @@
  * If you need more than MIB2, set the MIBs you want to use
  * by snmp_set_mibs().
  *
- * Finally, enable the agent by calling snmp_init()
+ * Finally, start the agent by calling net_snmp_agent_start() from
+ * snmp/snmp_agent.h.
  *
  * @defgroup snmp_core Core
  * @ingroup snmp

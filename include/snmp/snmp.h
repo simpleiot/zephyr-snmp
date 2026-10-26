@@ -69,11 +69,6 @@ struct snmp_varbind {
 	void *object_value;
 };
 
-/**
- * @ingroup snmp_core
- * Agent setup, start listening to port 161.
- */
-int snmp_init(void);
 void snmp_set_mibs(const struct snmp_mib **mibs, uint8_t num_mibs);
 
 void snmp_set_device_enterprise_oid(const struct snmp_obj_id *device_enterprise_oid);
@@ -119,13 +114,6 @@ uint8_t snmp_get_default_trap_version(void);
 #define SNMP_AUTH_TRAPS_ENABLED  1
 void snmp_set_auth_traps_enabled(uint8_t enable);
 uint8_t snmp_get_auth_traps_enabled(void);
-
-uint8_t snmp_v1_enabled(void);
-uint8_t snmp_v2c_enabled(void);
-uint8_t snmp_v3_enabled(void);
-void snmp_v1_enable(uint8_t enable);
-void snmp_v2c_enable(uint8_t enable);
-void snmp_v3_enable(uint8_t enable);
 
 const char *snmp_get_community(void);
 const char *snmp_get_community_write(void);
