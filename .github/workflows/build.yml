@@ -49,6 +49,18 @@ jobs:
             --inline-logs \
             --verbose
 
+      # A function declared in a public header but never defined compiles in
+      # an application and then fails to link, so check each library the
+      # samples built against the headers.
+      - name: Check that public functions are defined
+        working-directory: modules/lib/zephyr-snmp
+        run: |
+          libs="$(find twister-out -path '*/modules/snmp/libsnmp.a')"
+          test -n "$libs"
+          for lib in $libs; do
+            python3 -I scripts/check-declarations.py "$lib" include
+          done
+
       # Style settings come from .checkpatch.conf; the typedefs list it relies
       # on ships with Zephyr, so point at the copy in the workspace.
       - name: Run checkpatch on the changes
